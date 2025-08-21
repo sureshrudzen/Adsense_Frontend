@@ -8,29 +8,14 @@ import {
   TrashBinIcon,
 } from "../../icons";
 import Badge from "../ui/badge/Badge";
-import { useState, useMemo } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { useEffect } from "react";
-type FilterOption = "Last 7 Days" | "Last 30 Days" | "This Year" | "Custom Range";
-
-interface AdRecord {
-  date: string; // ISO date string
-  spend: number;
-  impressions: number;
-  clicks: number;
-  conversions: number;
-  roas: number;
-}
-
-interface AggregatedMetrics {
-  spend: number;
-  impressions: number;
-  clicks: number;
-  conversions: number;
-  roas: number;
-}
-
+import { useState, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "../../store";
+import { fetchReport, fetchSites } from "../../features/adsense/adsenseSlice";
+import { fetchOfflineReports } from "../../features/adsense/adsenseReportsOfflineSlice";
+import { useSearchParams } from "react-router-dom";
 interface MetricCardProps {
   title: string;
   value: string;
@@ -39,153 +24,168 @@ interface MetricCardProps {
   change: string;
 }
 
-const FILTER_OPTIONS: FilterOption[] = [
-  "Last 7 Days",
-  "Last 30 Days",
-  "This Year",
-  "Custom Range",
-];
-
-// Example dataset (daily metrics)
-const adsData: AdRecord[] = [
-  { date: "2025-08-01", spend: 450, impressions: 8000, clicks: 320, conversions: 60, roas: 3.5 },
-  { date: "2025-08-05", spend: 620, impressions: 9500, clicks: 400, conversions: 85, roas: 4.0 },
-  { date: "2025-07-20", spend: 700, impressions: 10000, clicks: 500, conversions: 100, roas: 3.7 },
-  { date: "2025-01-12", spend: 350, impressions: 6000, clicks: 200, conversions: 30, roas: 2.9 },
-];
-
 export default function AdsMetrics() {
-  const [selectedFilter, setSelectedFilter] = useState<FilterOption>("Last 7 Days");
-  const [customRange, setCustomRange] = useState<[Date | null, Date | null]>([null, null]);
-  const [startDate, endDate] = customRange;
-  const [msg, setMsg] = useState("");
-  console.log(msg,"message from frontend");
-  const metrics: AggregatedMetrics = useMemo(() => {
-    const today = new Date();
-    let start: Date | null = null;
-    let end: Date = today;
-
-    switch (selectedFilter) {
-      case "Last 7 Days":
-        start = new Date();
-        start.setDate(today.getDate() - 7);
-        break;
-      case "Last 30 Days":
-        start = new Date();
-        start.setDate(today.getDate() - 30);
-        break;
-      case "This Year":
-        start = new Date(today.getFullYear(), 0, 1);
-        break;
-      case "Custom Range":
-        if (startDate && endDate) {
-          start = startDate;
-          end = endDate;
-        }
-        break;
-    }
-
-    const filtered = adsData.filter((ad) => {
-      const adDate = new Date(ad.date);
-      return start !== null && adDate >= start && adDate <= end;
-    });
-
-    if (filtered.length === 0) {
-      return { spend: 0, impressions: 0, clicks: 0, conversions: 0, roas: 0 };
-    }
-
-    const totals = filtered.reduce(
-      (acc, ad) => {
-        acc.spend += ad.spend;
-        acc.impressions += ad.impressions;
-        acc.clicks += ad.clicks;
-        acc.conversions += ad.conversions;
-        acc.roas += ad.roas;
-        return acc;
-      },
-      { spend: 0, impressions: 0, clicks: 0, conversions: 0, roas: 0 }
-    );
-
-    // Average ROAS instead of sum
-    totals.roas = totals.roas / filtered.length;
-    return totals;
-  }, [selectedFilter, startDate, endDate]);
-
+  const [searchParams] = useSearchParams();
+  const accountId = searchParams.get("account") || "";
+  const dispatch = useDispatch<AppDispatch>();
+  // const { report, loadingReport, error } = useSelector(
+  //   (state: RootState) => state.adsense
+  // );
+  const { data, loading,error } = useSelector((state: RootState) => state.reportsOffline);
 
   useEffect(() => {
-    fetch("http://localhost:5000/")  // ✅ backend API call
-      .then(res => res.text())       // res.json() nahi, kyunki backend `res.send` kar raha hai
-      .then(data => setMsg(data))
-      .catch(err => console.error(err));
-  }, []);
+    dispatch(fetchOfflineReports({ accountId }));
+  }, [dispatch, accountId]);
+// console.log(report,"report")
+  console.log(data[0], "daadadadaaad")
+  const [dateRange, setDateRange] = useState("TODAY");
+  const [range, setRange] = useState<[Date | null, Date | null]>([null, null]);
+  const [country, setCountry] = useState("");
+  const [selectedSite, setSelectedSite] = useState<string>("");
+
+  const [startDate, endDate] = range;
+  // ✅ Extract totals from report
+  // const totals = report?.totals || [];
+  // Adsense API returns totals as an array of strings matching metrics order
+  // Example order: ["ESTIMATED_EARNINGS", "CLICKS", "PAGE_VIEWS", "IMPRESSIONS"]
+
+// ✅ Extract cells safely
+// const cells = reportData?.totals?.cells || [];
+// Example order: [EARNINGS, CLICKS, PAGE_VIEWS, IMPRESSIONS]
+const reportData: any = data[0];
+
+// Ek hi array bana lo dono cases ke liye
+const totalsArray: string[] =
+  Array.isArray(reportData?.totals)
+    ? reportData?.totals               // online → string[]
+    : reportData?.totals?.cells?.map((c: any) => c.value) || []; // offline → extract values
+
+// Ab yahan se common code chalega
+const totalSpend = Number(totalsArray[1] || 0);       // Earnings
+const totalClicks = Number(totalsArray[2] || 0);      // Clicks
+const totalPageViews = Number(totalsArray[3] || 0);   // Page Views
+const totalImpressions = Number(totalsArray[4] || 0); // Impressions
+
+  // Example ROAS calculation (if you store revenue in ESTIMATED_EARNINGS)
+  // const roas =
+  //   totalSpend > 0 ? (Number(totals[0]) / totalSpend).toFixed(2) : "0.0";
+  // useEffect(() => {
+  //   if (accountId) {
+  //     dispatch(
+  //       fetchReport({
+  //         accountId,
+  //         dateRange,
+  //         startDate: startDate?.toISOString().split("T")[0],
+  //         endDate: endDate?.toISOString().split("T")[0],
+  //         country,
+  //         selectedSite,
+  //       })
+  //     );
+  //   }
+  // }, [accountId, dateRange, startDate, endDate, country, selectedSite, dispatch]);
   return (
     <div className="space-y-4">
-      {/* Filter Dropdown */}
+      {/* Filters */}
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-          Ads Performance Report
-        </h2>
-        <div className="flex gap-3">
-          <select
-            value={selectedFilter}
-            onChange={(e) => setSelectedFilter(e.target.value as FilterOption)}
-            className="px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-          >
-            {FILTER_OPTIONS.map((option) => (
-              <option key={option}>{option}</option>
-            ))}
-          </select>
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+          Adsense Performance Report
+        </h3>
+        <div className="space-y-4 md:flex md:space-y-0 md:space-x-4">
+          {/* Date Range Dropdown */}
+          <div className="flex-1">
+            <label className="block text-sm font-medium">Date Range</label>
+            <select
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value)}
+              className="border p-2 rounded w-full"
+            >
+              <option value="TODAY">Today</option>
+              <option value="YESTERDAY">Yesterday</option>
+              <option value="LAST_7_DAYS">Last 7 days</option>
+              <option value="LAST_30_DAYS">Last 30 days</option>
+              <option value="CUSTOM">Custom</option>
+            </select>
+          </div>
 
-          {selectedFilter === "Custom Range" && (
-            <DatePicker
-              selectsRange
-              startDate={startDate}
-              endDate={endDate}
-              onChange={(update: [Date | null, Date | null]) => setCustomRange(update)}
-              isClearable
-              className="px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-            />
+          {/* Custom Date Picker */}
+          {dateRange === "CUSTOM" && (
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-1">
+                Select Range
+              </label>
+              <DatePicker
+                selectsRange
+                startDate={startDate}
+                endDate={endDate}
+                onChange={(update) =>
+                  setRange(update as [Date | null, Date | null])
+                }
+                isClearable
+                placeholderText="Select a date range"   // ✅ placeholder
+                className="border p-2 rounded w-full focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           )}
+
+
+          {/* Country Dropdown */}
+          <div className="flex-1">
+            <label className="block text-sm font-medium">Country</label>
+            <select
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              className="border p-2 rounded w-full"
+            >
+              <option value="">All</option>
+              <option value="IN">India</option>
+              <option value="US">United States</option>
+              <option value="GB">United Kingdom</option>
+              <option value="CA">Canada</option>
+              <option value="AU">Australia</option>
+            </select>
+          </div>
         </div>
       </div>
+      {error && <p className="text-red-500">{error}</p>}
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 md:gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:gap-6">
         <MetricCard
-          title="Total Spend"
-          value={`$${metrics.spend.toLocaleString()}`}
+          title="Total Earnings"
+          value={`$${totalSpend.toLocaleString()}`}
           Icon={DollarLineIcon}
           trend="up"
           change="8.2%"
         />
         <MetricCard
-          title="Impressions"
-          value={metrics.impressions.toLocaleString()}
-          Icon={EyeIcon}
-          trend="up"
-          change="5.6%"
-        />
-        <MetricCard
           title="Clicks"
-          value={metrics.clicks.toLocaleString()}
+          value={totalClicks.toLocaleString()}
           Icon={MailIcon}
           trend="down"
           change="2.9%"
         />
+
         <MetricCard
-          title="Conversions"
-          value={metrics.conversions.toLocaleString()}
+          title="Page Views"
+          value={totalPageViews.toLocaleString()}
           Icon={TableIcon}
           trend="up"
           change="6.3%"
         />
         <MetricCard
+          title="Impressions"
+          value={totalImpressions.toLocaleString()}
+          Icon={EyeIcon}
+          trend="up"
+          change="5.6%"
+        />
+        {/* <MetricCard
           title="ROAS"
-          value={`${metrics.roas.toFixed(1)}x`}
+          value={`${roas}x`}
           Icon={TrashBinIcon}
           trend="up"
           change="4.1%"
-        />
+        /> */}
       </div>
     </div>
   );
@@ -199,8 +199,12 @@ function MetricCard({ title, value, Icon, trend, change }: MetricCardProps) {
       </div>
       <div className="flex items-end justify-between mt-5">
         <div>
-          <span className="text-sm text-gray-500 dark:text-gray-400">{title}</span>
-          <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">{value}</h4>
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {title}
+          </span>
+          <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
+            {value}
+          </h4>
         </div>
         <Badge color={trend === "up" ? "success" : "error"}>
           {trend === "up" ? <ArrowUpIcon /> : <ArrowDownIcon />}

@@ -2,6 +2,7 @@ import EcommerceMetrics from "../../components/ecommerce/EcommerceMetrics";
 import RecentOrders from "../../components/ecommerce/RecentOrders";
 import PageMeta from "../../components/common/PageMeta";
 import LineChartOne from "../../components/charts/line/LineChartOne";
+import AdSenseDashboard from "../AddWebsite/Adsense";
 export default function Report() {
   return (
     <>
@@ -13,10 +14,11 @@ export default function Report() {
         <div className="col-12 space-y-6 xl:col-span-7">
           <EcommerceMetrics />
 
-          <LineChartOne />
+          {/* <LineChartOne /> */}
         </div>
         <div className="col-span-12 xl:col-span-7">
-          <RecentOrders />
+          {/* <RecentOrders /> */}
+          <AdSenseDashboard />
         </div>
       </div>
     </>

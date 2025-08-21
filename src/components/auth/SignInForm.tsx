@@ -45,8 +45,7 @@ export default function SignInForm() {
         localStorage.setItem("token", token);
 
         setMessage({ type: "success", text: "✅ Login successful!" });
-
-        // Redirect after short delay
+      // Redirect after short delay
         setTimeout(() => navigate("/dashboard"), 1000);
       } else {
         setMessage({

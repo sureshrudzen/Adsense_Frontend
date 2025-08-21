@@ -32,11 +32,11 @@ const navItems: NavItem[] = [
     name: "Dashboard",
     path: "/dashboard",
   },
-  {
-    icon: <GridIcon />,
-    name: "Report Analytics",
-    path: "/report"
-  },
+  // {
+  //   icon: <GridIcon />,
+  //   name: "Report Analytics",
+  //   path: "/report"
+  // },
   {
     icon: <GridIcon />,
     name: "Add Website",
@@ -44,7 +44,7 @@ const navItems: NavItem[] = [
   },
   {
     icon: <GridIcon />,
-    name: "Add Adsense Account",
+    name: "All Adsense Account",
     path: "/addAdsensAccount"
   },
   {

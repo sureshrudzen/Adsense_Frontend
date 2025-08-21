@@ -4,9 +4,7 @@ import { useSidebar } from "../context/SidebarContext";
 import { ThemeToggleButton } from "../components/common/ThemeToggleButton";
 import NotificationDropdown from "../components/header/NotificationDropdown";
 import UserDropdown from "../components/header/UserDropdown";
-import api from "../utils/api";
 const AppHeader: React.FC = () => {
-  const [connected, setConnected] = useState(false);
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
 
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
@@ -39,56 +37,6 @@ const AppHeader: React.FC = () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem("adsense_user");
-
-    if (storedUser) {
-      setConnected(true); // 👈 local storage mila matlab connected
-    } else {
-      setConnected(false);
-    }
-
-    // Optional: backend double-check bhi karwa sakte ho
-    checkConnection();
-  }, []);
-
-
-  const checkConnection = async () => {
-    try {
-      const res = await api.get("/auth/status", { withCredentials: true });
-      if (res.data.connected) {
-        localStorage.setItem("adsense_user", JSON.stringify(res.data.user));
-        setConnected(true);
-      } else {
-        localStorage.removeItem("adsense_user"); // 👈 logout case me hatao
-        setConnected(false);
-      }
-    } catch (err) {
-      console.error("Error checking AdSense status", err);
-      setConnected(false);
-    }
-  };
-
-
-  useEffect(() => {
-    checkConnection();
-  }, []);
-
-  const connectAdSense = () => {
-    window.location.href = "http://localhost:5000/api/auth/google";
-  };
-
-  const handleLogout = async () => {
-    try {
-      await api.get("/auth/logout");
-      localStorage.removeItem("adsense_user"); // 👈 yaha bhi
-      setConnected(false);
-    } catch (err) {
-      console.error("Logout failed", err);
-    }
-  };
-
   return (
     <header className="sticky top-0 flex w-full bg-white border-gray-200 z-99999 dark:border-gray-800 dark:bg-gray-900 lg:border-b">
       <div className="flex flex-col items-center justify-between grow lg:flex-row lg:px-6">
@@ -135,31 +83,6 @@ const AppHeader: React.FC = () => {
             {/* Dark Mode Toggler */}
             <ThemeToggleButton />
             <NotificationDropdown />
-
-            {connected ? (
-              <div className="flex gap-3">
-                <button
-                  disabled
-                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg"
-                >
-                  ✅ Connected
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
-                >
-                  Logout
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={connectAdSense}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-              >
-                Connect AdSense
-              </button>
-            )}
-
           </div>
           {/* User Dropdown */}
           <UserDropdown />
