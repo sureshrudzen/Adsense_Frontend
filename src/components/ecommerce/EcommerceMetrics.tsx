@@ -5,7 +5,6 @@ import {
   EyeIcon,
   MailIcon,
   TableIcon,
-  TrashBinIcon,
 } from "../../icons";
 import Badge from "../ui/badge/Badge";
 import DatePicker from "react-datepicker";
@@ -13,9 +12,9 @@ import "react-datepicker/dist/react-datepicker.css";
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "../../store";
-import { fetchReport, fetchSites } from "../../features/adsense/adsenseSlice";
 import { fetchOfflineReports } from "../../features/adsense/adsenseReportsOfflineSlice";
 import { useSearchParams } from "react-router-dom";
+import AdSenseDashboard from "../../pages/AddWebsite/Adsense";
 interface MetricCardProps {
   title: string;
   value: string;
@@ -24,71 +23,102 @@ interface MetricCardProps {
   change: string;
 }
 
-export default function AdsMetrics() {
+// 🔹 Helper: format Date → "YYYY-MM-DD"
+function formatDate(d: Date) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export default function AdsMetrics({ onData }: { onData?: (data: any) => void }) {
+
   const [searchParams] = useSearchParams();
   const accountId = searchParams.get("account") || "";
   const dispatch = useDispatch<AppDispatch>();
-  // const { report, loadingReport, error } = useSelector(
-  //   (state: RootState) => state.adsense
-  // );
-  const { data, loading,error } = useSelector((state: RootState) => state.reportsOffline);
+  const { data, loading, error } = useSelector(
+    (state: RootState) => state.reportsOffline
+  );
 
   useEffect(() => {
     dispatch(fetchOfflineReports({ accountId }));
   }, [dispatch, accountId]);
-// console.log(report,"report")
-  console.log(data[0], "daadadadaaad")
+
   const [dateRange, setDateRange] = useState("TODAY");
   const [range, setRange] = useState<[Date | null, Date | null]>([null, null]);
   const [country, setCountry] = useState("");
-  const [selectedSite, setSelectedSite] = useState<string>("");
 
   const [startDate, endDate] = range;
-  // ✅ Extract totals from report
-  // const totals = report?.totals || [];
-  // Adsense API returns totals as an array of strings matching metrics order
-  // Example order: ["ESTIMATED_EARNINGS", "CLICKS", "PAGE_VIEWS", "IMPRESSIONS"]
+  const todayReport = data.find((r: any) => r.type === "TODAY");
+  const last30Report = data.find((r: any) => r.type === "LAST_30_DAYS");
+  let rows: any[] = [];
 
-// ✅ Extract cells safely
-// const cells = reportData?.totals?.cells || [];
-// Example order: [EARNINGS, CLICKS, PAGE_VIEWS, IMPRESSIONS]
-const reportData: any = data[0];
+  if (dateRange === "TODAY") {
+    rows = todayReport?.rows || [];
+  } else {
+    rows = last30Report?.rows || [];
+  }
+  // 🔹 Dates for today / yesterday
+  const todayStr = formatDate(new Date());
+  const yesterdayStr = formatDate(new Date(Date.now() - 86400000));
 
-// Ek hi array bana lo dono cases ke liye
-const totalsArray: string[] =
-  Array.isArray(reportData?.totals)
-    ? reportData?.totals               // online → string[]
-    : reportData?.totals?.cells?.map((c: any) => c.value) || []; // offline → extract values
+  // 🔹 Start / End for custom ranges
+  const startStr = startDate ? formatDate(startDate) : null;
+  const endStr = endDate ? formatDate(endDate) : null;
+  let filteredRows: any[] = [];
 
-// Ab yahan se common code chalega
-const totalSpend = Number(totalsArray[1] || 0);       // Earnings
-const totalClicks = Number(totalsArray[2] || 0);      // Clicks
-const totalPageViews = Number(totalsArray[3] || 0);   // Page Views
-const totalImpressions = Number(totalsArray[4] || 0); // Impressions
+  if (dateRange === "TODAY") {
+    // Backend se TODAY already filtered aata hai
+    filteredRows = rows;
+  } else if (dateRange === "YESTERDAY") {
+    filteredRows = rows.filter((row) => row.cells[0]?.value === yesterdayStr);
+  } else if (dateRange === "LAST_7_DAYS") {
+    const last7 = formatDate(new Date(Date.now() - 6 * 86400000));
+    filteredRows = rows.filter(
+      (row) => row.cells[0]?.value >= last7 && row.cells[0]?.value <= todayStr
+    );
+  } else if (dateRange === "LAST_30_DAYS") {
+    const last30 = formatDate(new Date(Date.now() - 29 * 86400000));
+    filteredRows = rows.filter(
+      (row) => row.cells[0]?.value >= last30 && row.cells[0]?.value <= todayStr
+    );
+  } else if (dateRange === "CUSTOM" && startStr && endStr) {
+    filteredRows = rows.filter(
+      (row) => row.cells[0]?.value >= startStr && row.cells[0]?.value <= endStr
+    );
+  }
+  // 🔹 Aggregate totals from filtered rows
+  const totals = filteredRows.reduce(
+    (acc, row) => {
+      const cells = row.cells || [];
+      acc.earnings += Number(cells[1]?.value || 0);
+      acc.clicks += Number(cells[2]?.value || 0);
+      acc.pageViews += Number(cells[3]?.value || 0);
+      acc.impressions += Number(cells[4]?.value || 0);
+      return acc;
+    },
+    { earnings: 0, clicks: 0, pageViews: 0, impressions: 0 }
+  );
+  const result = {
+    rows: filteredRows,
+    headers: todayReport?.headers || last30Report?.headers || [],
+    dateRange,
+    totals,
+  };
 
-  // Example ROAS calculation (if you store revenue in ESTIMATED_EARNINGS)
-  // const roas =
-  //   totalSpend > 0 ? (Number(totals[0]) / totalSpend).toFixed(2) : "0.0";
-  // useEffect(() => {
-  //   if (accountId) {
-  //     dispatch(
-  //       fetchReport({
-  //         accountId,
-  //         dateRange,
-  //         startDate: startDate?.toISOString().split("T")[0],
-  //         endDate: endDate?.toISOString().split("T")[0],
-  //         country,
-  //         selectedSite,
-  //       })
-  //     );
-  //   }
-  // }, [accountId, dateRange, startDate, endDate, country, selectedSite, dispatch]);
+  // agar parent ne callback diya hai to use bhej do
+  useEffect(() => {
+    if (onData) {
+      onData(result);
+    }
+  }, [filteredRows, dateRange, totals]);
+
   return (
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-          Adsense Performance Report
+          Adsense Performance Report ({dateRange})
         </h3>
         <div className="space-y-4 md:flex md:space-y-0 md:space-x-4">
           {/* Date Range Dropdown */}
@@ -121,12 +151,11 @@ const totalImpressions = Number(totalsArray[4] || 0); // Impressions
                   setRange(update as [Date | null, Date | null])
                 }
                 isClearable
-                placeholderText="Select a date range"   // ✅ placeholder
+                placeholderText="Select a date range"
                 className="border p-2 rounded w-full focus:ring-2 focus:ring-blue-500"
               />
             </div>
           )}
-
 
           {/* Country Dropdown */}
           <div className="flex-1">
@@ -147,46 +176,43 @@ const totalImpressions = Number(totalsArray[4] || 0); // Impressions
         </div>
       </div>
       {error && <p className="text-red-500">{error}</p>}
-
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:gap-6">
         <MetricCard
           title="Total Earnings"
-          value={`$${totalSpend.toLocaleString()}`}
+          value={`$${totals.earnings.toLocaleString()}`}
           Icon={DollarLineIcon}
           trend="up"
           change="8.2%"
         />
         <MetricCard
           title="Clicks"
-          value={totalClicks.toLocaleString()}
+          value={totals.clicks.toLocaleString()}
           Icon={MailIcon}
           trend="down"
           change="2.9%"
         />
-
         <MetricCard
           title="Page Views"
-          value={totalPageViews.toLocaleString()}
+          value={totals.pageViews.toLocaleString()}
           Icon={TableIcon}
           trend="up"
           change="6.3%"
         />
         <MetricCard
           title="Impressions"
-          value={totalImpressions.toLocaleString()}
+          value={totals.impressions.toLocaleString()}
           Icon={EyeIcon}
           trend="up"
           change="5.6%"
         />
-        {/* <MetricCard
-          title="ROAS"
-          value={`${roas}x`}
-          Icon={TrashBinIcon}
-          trend="up"
-          change="4.1%"
-        /> */}
       </div>
+      <AdSenseDashboard
+        rows={filteredRows}
+        headers={todayReport?.headers || last30Report?.headers || []}
+        dateRange={dateRange}
+        totals={totals}   // ✅ totals bhi bhej do
+      />
     </div>
   );
 }
@@ -214,3 +240,5 @@ function MetricCard({ title, value, Icon, trend, change }: MetricCardProps) {
     </div>
   );
 }
+
+

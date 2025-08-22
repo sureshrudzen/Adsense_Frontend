@@ -1,9 +1,10 @@
 import EcommerceMetrics from "../../components/ecommerce/EcommerceMetrics";
-import RecentOrders from "../../components/ecommerce/RecentOrders";
 import PageMeta from "../../components/common/PageMeta";
+import { useState } from "react";
 import LineChartOne from "../../components/charts/line/LineChartOne";
 import AdSenseDashboard from "../AddWebsite/Adsense";
 export default function Report() {
+  const [adsenseData, setAdsenseData] = useState<any>(null);
   return (
     <>
       <PageMeta
@@ -12,15 +13,19 @@ export default function Report() {
       />
       <div className="space-y-6 grid-cols-12 md:gap-6">
         <div className="col-12 space-y-6 xl:col-span-7">
-          <EcommerceMetrics />
+          <EcommerceMetrics onData={setAdsenseData} />
 
           {/* <LineChartOne /> */}
         </div>
-        <div className="col-span-12 xl:col-span-7">
-          {/* <RecentOrders /> */}
-          <AdSenseDashboard />
-        </div>
       </div>
+      {/* {adsenseData && (
+        <AdSenseDashboard
+          rows={adsenseData.rows}
+          headers={adsenseData.headers}
+          dateRange={adsenseData.dateRange}
+          totals={adsenseData.totals}
+        />
+      )} */}
     </>
   );
 }
