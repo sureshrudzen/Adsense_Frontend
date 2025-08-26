@@ -12,7 +12,7 @@ interface ReportViewerProps {
   error: string | null;
 }
 
-export default function ReportViewer({ sites, loading, error }: ReportViewerProps) {
+export default function AdManagerSites({ sites, loading, error }: ReportViewerProps) {
   const [selectedSite, setSelectedSite] = useState<string>("");
 
   if (loading) {
@@ -27,7 +27,7 @@ export default function ReportViewer({ sites, loading, error }: ReportViewerProp
     <div className="p-4 border rounded-lg shadow-md bg-white">
       {/* ✅ Sites List */}
       <div>
-        <h3 className="font-semibold text-gray-800 dark:text-white/90">Registered Sites</h3>
+        <h3 className="font-semibold text-gray-800 dark:text-white/90">Registered Sites (subdomain name)</h3>
         <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm mt-2">
           <table className="w-full border-collapse">
             <thead>

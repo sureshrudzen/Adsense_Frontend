@@ -33,12 +33,8 @@ export const fetchOfflineReports = createAsyncThunk<
     { accountId?: string }
 >("reports/fetchReports", async ({ accountId }, { rejectWithValue }) => {
     try {
-        const token = localStorage.getItem("token");
         const res = await api.get("/adsense/offline/reports", {
             params: { accountId },
-            headers: {
-                Authorization: `Bearer ${token}`,   // ✅ yaha se backend ko token milega
-            },
         });
         return res.data;
     } catch (err: any) {

@@ -7,7 +7,16 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  withCredentials: true,
+  withCredentials: true, // agar cookies bhi use ho rahi hain
+});
+
+// 🔹 Interceptor: Har request me token lagana
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token"); // login ke baad store kiya hoga
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 export default api;

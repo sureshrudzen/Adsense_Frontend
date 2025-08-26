@@ -6,6 +6,8 @@ import RecentOrders from "../../components/ecommerce/RecentOrders";
 import DemographicCard from "../../components/ecommerce/DemographicCard";
 import PageMeta from "../../components/common/PageMeta";
 import AdSenseDashboard from "../AddWebsite/Adsense";
+import DashboardKpi from "../../components/ecommerce/dashboardKpi";
+import ConnectAdSenseAccount from "../Adsense/ConnectAdSenseAccount";
 
 export default function Home() {
   return (
@@ -16,9 +18,12 @@ export default function Home() {
       />
       <div className="">
         <div className="">
-          <EcommerceMetrics />
-          <AdSenseDashboard />
-        {/* <MonthlySalesChart /> */}
+          <DashboardKpi />
+          {/* <AdSenseDashboard /> */}
+          {/* <MonthlySalesChart /> */}
+        </div>
+        <div>
+          <ConnectAdSenseAccount />
         </div>
 
         {/* <div className="col-span-12 xl:col-span-5">

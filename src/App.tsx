@@ -19,7 +19,9 @@ import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
 import Report from "./pages/Dashboard/report";
+import AdManagerReport from "./pages/Dashboard/admanager/Report"
 import AddWebsite from "./pages/AddWebsite/addwebsite";
+import AdManager from "./pages/AdManager/Admanager";
 import ConnectAdSenseAccount from "./pages/Adsense/ConnectAdSenseAccount";
 export default function App() {
   return (
@@ -31,9 +33,10 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route index path="/dashboard" element={<Home />} />
             <Route path="/report" element={<Report />} />
+            <Route path="/reportadmanager" element={<AdManagerReport />} />
             <Route path="/addwebsite" element={<AddWebsite />} />       {/* Others Page */}
             <Route path="/addAdsensAccount" element={<ConnectAdSenseAccount />} />       {/* Others Page */}
-
+            <Route path="/admanagers" element={<AdManager />} />
             <Route path="/profile" element={<UserProfiles />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/blank" element={<Blank />} />

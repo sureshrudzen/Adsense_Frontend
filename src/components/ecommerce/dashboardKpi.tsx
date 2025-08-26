@@ -9,15 +9,12 @@ import {
 import Badge from "../ui/badge/Badge";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "../../store";
-import { fetchSites } from "../../features/sites";
 import { fetchOfflineReports } from "../../features/adsense/adsenseReportsOfflineSlice";
 import { useSearchParams } from "react-router-dom";
 import AdSenseDashboard from "../../pages/AddWebsite/Adsense";
-import ReportViewer from "../../pages/AddWebsite/ReportViewer";
-
 interface MetricCardProps {
   title: string;
   value: string;
@@ -34,23 +31,8 @@ function formatDate(d: Date) {
   return `${year}-${month}-${day}`;
 }
 
-// 🔹 Helper: human-readable date range label
-function getDateRangeLabel(
-  dateRange: string,
-  start: Date | null,
-  end: Date | null
-) {
-  if (dateRange === "CUSTOM" && start && end) {
-    return `${formatDate(start)} → ${formatDate(end)}`;
-  }
-  if (dateRange === "TODAY") return "Today";
-  if (dateRange === "YESTERDAY") return "Yesterday";
-  if (dateRange === "LAST_7_DAYS") return "Last 7 Days";
-  if (dateRange === "LAST_30_DAYS") return "Last 30 Days";
-  return dateRange;
-}
+export default function dDashboardKpi() {
 
-export default function AdsMetrics({ onData }: { onData?: (data: any) => void }) {
   const [searchParams] = useSearchParams();
   const accountId = searchParams.get("account") || "";
   const dispatch = useDispatch<AppDispatch>();
@@ -58,21 +40,9 @@ export default function AdsMetrics({ onData }: { onData?: (data: any) => void })
     (state: RootState) => state.reportsOffline
   );
 
-  useEffect(() => {
-    dispatch(fetchOfflineReports({ accountId }));
-  }, [dispatch, accountId]);
-
-  const {
-    items: sites,
-    loading: sitesLoading,
-    error: sitesError,
-  } = useSelector((state: RootState) => state.sites);
-
-  useEffect(() => {
-    if (accountId) {
-      dispatch(fetchSites(accountId));
-    }
-  }, [dispatch, accountId]);
+  // useEffect(() => {
+  //   dispatch(fetchOfflineReports({ accountId }));
+  // }, [dispatch, accountId]);
 
   const [dateRange, setDateRange] = useState("TODAY");
   const [range, setRange] = useState<[Date | null, Date | null]>([null, null]);
@@ -81,14 +51,13 @@ export default function AdsMetrics({ onData }: { onData?: (data: any) => void })
   const [startDate, endDate] = range;
   const todayReport = data.find((r: any) => r.type === "TODAY");
   const last30Report = data.find((r: any) => r.type === "LAST_30_DAYS");
-
   let rows: any[] = [];
+
   if (dateRange === "TODAY") {
     rows = todayReport?.rows || [];
   } else {
     rows = last30Report?.rows || [];
   }
-
   // 🔹 Dates for today / yesterday
   const todayStr = formatDate(new Date());
   const yesterdayStr = formatDate(new Date(Date.now() - 86400000));
@@ -96,9 +65,10 @@ export default function AdsMetrics({ onData }: { onData?: (data: any) => void })
   // 🔹 Start / End for custom ranges
   const startStr = startDate ? formatDate(startDate) : null;
   const endStr = endDate ? formatDate(endDate) : null;
-
   let filteredRows: any[] = [];
+
   if (dateRange === "TODAY") {
+    // Backend se TODAY already filtered aata hai
     filteredRows = rows;
   } else if (dateRange === "YESTERDAY") {
     filteredRows = rows.filter((row) => row.cells[0]?.value === yesterdayStr);
@@ -117,8 +87,7 @@ export default function AdsMetrics({ onData }: { onData?: (data: any) => void })
       (row) => row.cells[0]?.value >= startStr && row.cells[0]?.value <= endStr
     );
   }
-
-  // 🔹 Aggregate totals
+  // 🔹 Aggregate totals from filtered rows
   const totals = filteredRows.reduce(
     (acc, row) => {
       const cells = row.cells || [];
@@ -130,14 +99,28 @@ export default function AdsMetrics({ onData }: { onData?: (data: any) => void })
     },
     { earnings: 0, clicks: 0, pageViews: 0, impressions: 0 }
   );
+  // const result = useMemo(() => {
+  //   return {
+  //     rows: filteredRows,
+  //     headers: todayReport?.headers || last30Report?.headers || [],
+  //     dateRange,
+  //     totals,
+  //   };
+  // }, [filteredRows, dateRange, totals, todayReport, last30Report]);
 
+
+  // agar parent ne callback diya hai to use bhej do
+  // useEffect(() => {
+  //   if (onData) {
+  //     onData(result);
+  //   }
+  // }, [result, onData]);
   return (
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-          Adsense Performance Report (
-          {getDateRangeLabel(dateRange, startDate, endDate)})
+          Adsense Performance Report ({dateRange})
         </h3>
         <div className="space-y-4 md:flex md:space-y-0 md:space-x-4">
           {/* Date Range Dropdown */}
@@ -194,9 +177,7 @@ export default function AdsMetrics({ onData }: { onData?: (data: any) => void })
           </div>
         </div>
       </div>
-
       {error && <p className="text-red-500">{error}</p>}
-
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:gap-6">
         <MetricCard
@@ -228,13 +209,12 @@ export default function AdsMetrics({ onData }: { onData?: (data: any) => void })
           change="5.6%"
         />
       </div>
-      <ReportViewer sites={sites} loading={sitesLoading} error={sitesError} />
-      <AdSenseDashboard
+      {/* <AdSenseDashboard
         rows={filteredRows}
         headers={todayReport?.headers || last30Report?.headers || []}
-        dateRange={getDateRangeLabel(dateRange, startDate, endDate)}
-        totals={totals}
-      />
+        dateRange={dateRange}
+        totals={totals}   // ✅ totals bhi bhej do
+      /> */}
     </div>
   );
 }
@@ -262,3 +242,5 @@ function MetricCard({ title, value, Icon, trend, change }: MetricCardProps) {
     </div>
   );
 }
+
+

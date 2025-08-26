@@ -6,6 +6,7 @@ export interface AdsenseAccount {
     _id?: string;
     accountId: string;
     displayName?: string;
+    email?: string;
 }
 
 export interface Site {
@@ -54,7 +55,7 @@ const initialState: AdsenseState = {
     error: null,
     search: "",
     page: 1,
-    pageSize: 5,
+    pageSize: 10,
     sites: [],
     report: null,
     loadingSites: false,
@@ -67,13 +68,8 @@ export const fetchAccounts = createAsyncThunk(
     "adsense/fetchAccounts",
     async (_, { rejectWithValue }) => {
         try {
-            const token = localStorage.getItem("token");
             const res = await api.get<{ accounts: AdsenseAccount[] }>(
                 "/auth/accounts",
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                    withCredentials: true,
-                }
             );
             return res.data.accounts;
         } catch (err: any) {
@@ -87,42 +83,19 @@ export const deleteAccount = createAsyncThunk(
     "adsense/deleteAccount",
     async (accountId: string, { rejectWithValue }) => {
         try {
-            const token = localStorage.getItem("token");
-            await api.delete(`/adsense/accounts/${accountId}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            await api.delete(`/adsense/accounts/${accountId}`,
+            );
             return accountId;
         } catch (err: any) {
             return rejectWithValue("Failed to delete AdSense account");
         }
     }
 );
-
-// Fetch Sites
-export const fetchSites = createAsyncThunk(
-    "adsense/fetchSites",
-    async (accountId: string, { rejectWithValue }) => {
-        try {
-            const token = localStorage.getItem("token");
-            const res = await api.get<{ sites: Site[] }>("/adsense/sites", {
-                params: { accountId },
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            return res.data.sites || [];
-        } catch (err: any) {
-            return rejectWithValue(
-                err.response?.data?.error || "Failed to fetch sites"
-            );
-        }
-    }
-);
-
 // Fetch Report
 export const fetchReport = createAsyncThunk(
     "adsense/fetchReport",
     async (filters: ReportFilters, { rejectWithValue }) => {
         try {
-            const token = localStorage.getItem("token");
             const res = await api.get("/adsense/report", {
                 params: {
                     accountId: filters.accountId,
@@ -138,7 +111,6 @@ export const fetchReport = createAsyncThunk(
                     endDate:
                         filters.dateRange === "CUSTOM" ? filters.endDate : undefined,
                 },
-                headers: { Authorization: `Bearer ${token}` },
             });
 
             return res.data as ReportData;
@@ -184,22 +156,6 @@ const adsenseSlice = createSlice({
             .addCase(deleteAccount.rejected, (state, action) => {
                 state.error = action.payload as string;
             });
-
-        // Sites
-        builder
-            .addCase(fetchSites.pending, (state) => {
-                state.loadingSites = true;
-                state.error = null;
-            })
-            .addCase(fetchSites.fulfilled, (state, action) => {
-                state.loadingSites = false;
-                state.sites = action.payload;
-            })
-            .addCase(fetchSites.rejected, (state, action) => {
-                state.loadingSites = false;
-                state.error = action.payload as string;
-            });
-
         // Report
         builder
             .addCase(fetchReport.pending, (state) => {

@@ -1,0 +1,21 @@
+
+import PageMeta from "../../../components/common/PageMeta";
+import MainLayoutManager from "../../../components/admanager/MainLayoutManager";
+
+export default function Report() {
+    return (
+        <>
+            <PageMeta
+                title="Report Analytics| rudzen tech pvt.ltd"
+                description="This is React.js Ecommerce Dashboard page for TailAdmin - React.js Tailwind CSS Admin Dashboard Template"
+            />
+            <div className="space-y-6 grid-cols-12 md:gap-6">
+                <div className="col-12 space-y-6 xl:col-span-7">
+                    <MainLayoutManager />
+
+                    {/* <LineChartOne /> */}
+                </div>
+            </div>
+        </>
+    );
+}

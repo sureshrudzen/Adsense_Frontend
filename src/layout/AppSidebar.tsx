@@ -44,8 +44,13 @@ const navItems: NavItem[] = [
   },
   {
     icon: <GridIcon />,
-    name: "All Adsense Account",
+    name: "All Adsense Accounts",
     path: "/addAdsensAccount"
+  },
+   {
+    icon: <GridIcon />,
+    name: "All Ad Manager Accounts",
+    path: "/admanagers"
   },
   {
     icon: <GridIcon />,
