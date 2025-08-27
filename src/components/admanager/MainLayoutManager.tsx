@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
     ArrowDownIcon,
     ArrowUpIcon,
@@ -14,279 +14,333 @@ import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "../../store";
 import { fetchReport } from "../../features/adManager/reportAdManagerSlice";
 import { useSearchParams } from "react-router-dom";
-import AdManagerSites from "./AdManagerSites";
 import ReportListManager from "./ReportListManager";
 
-// Helper: Format date to YYYY-MM-DD
+// Date formatting helper
 function formatDate(d: Date) {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate()
+    ).padStart(2, "0")}`;
 }
 
-// Label helper
-function getDateRangeLabel(dateRange: string, start: Date | null, end: Date | null) {
-    if (dateRange === "CUSTOM" && start && end) {
-        return `${formatDate(start)} → ${formatDate(end)}`;
-    }
-    const labels: Record<string, string> = {
+// Date range label helper
+function getDateRangeLabel(range: string, start: Date | null, end: Date | null) {
+    if (range === "CUSTOM" && start && end) return `${formatDate(start)} → ${formatDate(end)}`;
+    const map: Record<string, string> = {
         ALL: "All Dates",
         TODAY: "Today",
         YESTERDAY: "Yesterday",
         LAST_7_DAYS: "Last 7 Days",
         LAST_30_DAYS: "Last 30 Days",
     };
-    return labels[dateRange] || dateRange;
+    return map[range] ?? range;
 }
 
-interface MetricCardProps {
+// Metric display card
+function MetricCard({
+    title,
+    value,
+    Icon,
+    trend,
+}: {
     title: string;
     value: string;
     Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
     trend: "up" | "down";
-    change: string;
+}) {
+    return (
+        <div className="rounded-2xl border p-5 bg-white dark:bg-gray-800">
+            <Icon className="w-6 h-6 text-gray-700 dark:text-white" />
+            <div className="mt-2 flex justify-between items-end">
+                <div>
+                    <div className="text-sm text-gray-500">{title}</div>
+                    <div className="font-bold text-lg">{value}</div>
+                </div>
+                <Badge color={trend === "up" ? "success" : "error"}>
+                    {trend === "up" ? <ArrowUpIcon /> : <ArrowDownIcon />}
+                </Badge>
+            </div>
+        </div>
+    );
 }
 
 export default function MainLayoutManager() {
     const [searchParams] = useSearchParams();
     const networkId = searchParams.get("networkId") || "";
     const dispatch = useDispatch<AppDispatch>();
+    const { data, error } = useSelector((state: RootState) => state.admanagerReport);
 
-    const { data, loading, error } = useSelector(
-        (state: RootState) => state.admanagerReport
-    );
-    const { items: sites, loading: sitesLoading, error: sitesError } =
-        useSelector((state: RootState) => state.sites);
-
-    useEffect(() => {
-        if (networkId) dispatch(fetchReport(networkId));
-    }, [dispatch, networkId]);
-
-    const [dateRange, setDateRange] = useState("ALL"); // default ALL
+    const [dateRange, setDateRange] = useState("TODAY");
     const [range, setRange] = useState<[Date | null, Date | null]>([null, null]);
     const [country, setCountry] = useState("");
-    const [startDate, endDate] = range;
+    const [showCountry, setShowCountry] = useState(false);
+    const [site, setSite] = useState("");
+    const [showSite, setShowSite] = useState(false);
 
-    const today = new Date();
-    const yesterday = new Date(Date.now() - 86400000);
-    const last7Start = new Date();
-    last7Start.setDate(today.getDate() - 6);
-    const last30Start = new Date();
-    last30Start.setDate(today.getDate() - 29);
+    const [start, end] = range;
+
+    useEffect(() => {
+        if (networkId) {
+            dispatch(fetchReport({ networkId, dateRange }));
+        }
+    }, [dispatch, networkId, dateRange]);
 
     const rows = data?.rows || [];
     const uniqueCountries = Array.from(new Set(rows.map((r) => r.country))).filter(Boolean);
+    const uniqueSites = Array.from(new Set(rows.map((r) => r.site))).filter(Boolean);
 
-    const normalizeDate = (d: Date) => {
-        const dt = new Date(d);
-        dt.setHours(0, 0, 0, 0); // normalize to midnight
-        return dt;
-    };
+    const normalize = (d: Date) => new Date(d.setHours(0, 0, 0, 0));
+    const today = normalize(new Date());
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const last7 = new Date(today);
+    last7.setDate(today.getDate() - 6);
+    const last30 = new Date(today);
+    last30.setDate(today.getDate() - 29);
 
-    const filteredRows = rows.filter((row) => {
-        if (!row.reportDate) return false;
-
-        const reportDate = normalizeDate(new Date(row.reportDate));
-        const today = normalizeDate(new Date());
-        const yesterday = new Date(today);
-        yesterday.setDate(today.getDate() - 1);
-
-        const last7Start = new Date(today);
-        last7Start.setDate(today.getDate() - 6); // last 7 days includes today and 6 previous days
-
-        const last30Start = new Date(today);
-        last30Start.setDate(today.getDate() - 29);
-
-        const start = startDate ? normalizeDate(startDate) : null;
-        const end = endDate ? normalizeDate(endDate) : null;
-
-        let isInRange = false;
-
-        switch (dateRange) {
-            case "ALL":
-                isInRange = true; // show all dates
-                break;
-            case "TODAY":
-                isInRange = reportDate.getTime() === today.getTime();
-                break;
-            case "YESTERDAY":
-                isInRange = reportDate.getTime() === yesterday.getTime();
-                break;
-            case "LAST_7_DAYS":
-                isInRange = reportDate >= last7Start && reportDate <= today;
-                break;
-            case "LAST_30_DAYS":
-                isInRange = reportDate >= last30Start && reportDate <= today;
-                break;
-            case "CUSTOM":
-                if (start && end) {
-                    isInRange = reportDate >= start && reportDate <= end;
+    const filtered = useMemo(() => {
+        if (dateRange === "ALL" || dateRange === "CUSTOM") {
+            return rows.filter((r) => {
+                const d = normalize(new Date(r.reportDate));
+                let inRange = true;
+                if (dateRange === "CUSTOM" && start && end) {
+                    inRange = d >= normalize(start) && d <= normalize(end);
                 }
-                break;
-            default:
-                isInRange = true;
+                const matchCountry = country
+                    ? r.country?.toLowerCase() === country.toLowerCase()
+                    : true;
+                const matchSite = site ? r.site?.toLowerCase() === site.toLowerCase() : true;
+                return inRange && matchCountry && matchSite;
+            });
         }
 
-        // filter by country if selected
-        const matchesCountry = country
-            ? row.country?.toLowerCase() === country.toLowerCase()
-            : true;
+        // For fixed dateRange values, backend returns filtered data by date; only filter country/site here
+        return rows.filter((r) => {
+            const matchCountry = country
+                ? r.country?.toLowerCase() === country.toLowerCase()
+                : true;
+            const matchSite = site ? r.site?.toLowerCase() === site.toLowerCase() : true;
+            return matchCountry && matchSite;
+        });
+    }, [rows, dateRange, start, end, country, site]);
 
-        return isInRange && matchesCountry;
-    });
-    const totals = filteredRows.reduce(
-        (acc, row) => {
-            acc.adxCostPerClick += Number(row.adxCostPerClick ?? 0);
-            acc.adxLineItemClicks += Number(row.adxLineItemClicks ?? 0);
-            acc.adxLineItemImpressions += Number(row.adxLineItemImpressions ?? 0);
-            acc.adxLineItemCtr += Number(row.adxLineItemCtr ?? 0);
-            acc.adServerAllRevenueGross += Number(row.adServerAllRevenueGross ?? 0);
-            acc.activeViewViewableRate += Number(row.activeViewViewableRate ?? 0);
-            acc.totalLineItemClicks += Number(row.totalLineItemClicks ?? 0);
+    // Calculate totals from filtered data
+    const totals = filtered.reduce(
+        (acc, r) => {
+            const impressions = r.adxExchangeLineItemLevelImpressions ?? 0;
+            const clicks = r.adxExchangeLineItemLevelClicks ?? 0;
+            const revenue = r.adxExchangeLineItemLevelRevenue ?? 0;
+
+            acc.impressions += impressions;
+            acc.clicks += clicks;
+            acc.revenue += revenue;
             return acc;
         },
         {
-            adxCostPerClick: 0,
-            adxLineItemClicks: 0,
-            adxLineItemImpressions: 0,
-            adxLineItemCtr: 0,
-            adServerAllRevenueGross: 0,
-            activeViewViewableRate: 0,
-            totalLineItemClicks: 0,
+            impressions: 0,
+            clicks: 0,
+            revenue: 0,
         }
     );
 
+    // Derived totals with calculated metrics
+    const derivedTotals = {
+        impressions: totals.impressions,
+        clicks: totals.clicks,
+        revenue: totals.revenue,
+        ctr: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
+        averageECPM:
+            totals.impressions > 0
+                ? (totals.revenue / totals.impressions) * 1000
+                : 0,
+        costPerClick:
+            totals.clicks > 0 ? totals.revenue / totals.clicks : 0,
+    };
 
+    function formatNumber(num: number) {
+        if (num >= 1e9) return (num / 1e9).toFixed(2);
+        if (num >= 1e6) return (num / 1e6).toFixed(2);
+        if (num >= 1e3) return (num / 1e3).toFixed(2);
+        return num.toFixed(2);
+    }
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-                    Ad Manager Performance Report ({getDateRangeLabel(dateRange, startDate, endDate)})
+                <h3 className="text-lg font-semibold">
+                    Ad Manager Performance Report ({getDateRangeLabel(dateRange, start, end)})
                 </h3>
                 <div className="space-y-4 md:flex md:space-y-0 md:space-x-4">
+                    {/* Date Range Selector */}
                     <div className="flex-1">
-                        <label className="block text-sm font-medium">Date Range</label>
+                        <label className="block text-sm">Date Range</label>
                         <select
                             value={dateRange}
                             onChange={(e) => setDateRange(e.target.value)}
                             className="border p-2 rounded w-full"
                         >
-                            <option value="ALL">All Dates</option>
-                            <option value="TODAY">Today</option>
-                            <option value="YESTERDAY">Yesterday</option>
-                            <option value="LAST_7_DAYS">Last 7 days</option>
-                            <option value="LAST_30_DAYS">Last 30 days</option>
-                            <option value="CUSTOM">Custom</option>
+                            {["ALL", "TODAY", "YESTERDAY", "LAST_7_DAYS", "LAST_30_DAYS", "CUSTOM"].map(
+                                (opt) => (
+                                    <option key={opt} value={opt}>
+                                        {getDateRangeLabel(opt, start, end)}
+                                    </option>
+                                )
+                            )}
                         </select>
                     </div>
                     {dateRange === "CUSTOM" && (
                         <div className="flex-1">
-                            <label className="block text-sm font-medium mb-1">Select Range</label>
+                            <label className="block text-sm ">Select Range</label>
                             <DatePicker
                                 selectsRange
-                                startDate={startDate}
-                                endDate={endDate}
-                                onChange={(update) => setRange(update as [Date | null, Date | null])}
+                                startDate={start}
+                                endDate={end}
+                                onChange={(u) => setRange(u as [Date | null, Date | null])}
                                 isClearable
-                                placeholderText="Select a date range"
-                                className="border p-2 rounded w-full focus:ring-2 focus:ring-blue-500"
+                                placeholderText="Choose date range"
+                                className="border p-2 rounded w-full"
                             />
                         </div>
                     )}
-                    <div className="flex-1">
-                        <label className="block text-sm font-medium">Country</label>
-                        <select
-                            value={country}
-                            onChange={(e) => setCountry(e.target.value)}
-                            className="border p-2 rounded w-full"
-                        >
-                            <option value="">All</option>
-                            {uniqueCountries.map((c) => (
-                                <option key={c} value={c}>
-                                    {c}
-                                </option>
-                            ))}
-                        </select>
+
+                    {/* Country Search */}
+                    <div className="flex-1 relative">
+                        <label className="block text-sm ">Country</label>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={country}
+                                onChange={(e) => setCountry(e.target.value)}
+                                placeholder="Search country"
+                                className="border p-2 pr-10 rounded w-full"
+                                onFocus={() => setShowCountry(true)}
+                                onBlur={() => setTimeout(() => setShowCountry(false), 150)}
+                            />
+                            {country && (
+                                <button
+                                    onClick={() => setCountry("")}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-red-500"
+                                    type="button"
+                                >
+                                    &times;
+                                </button>
+                            )}
+                        </div>
+                        {showCountry && (
+                            <ul className="absolute z-10 w-full max-h-40 overflow-y-auto bg-white border mt-1 rounded shadow">
+                                {uniqueCountries
+                                    .filter((c) => c.toLowerCase().includes(country.toLowerCase()))
+                                    .map((c) => (
+                                        <li
+                                            key={c}
+                                            className="px-3 py-1 hover:bg-blue-100 cursor-pointer"
+                                            onClick={() => {
+                                                setCountry(c);
+                                                setShowCountry(false);
+                                            }}
+                                        >
+                                            {c}
+                                        </li>
+                                    ))}
+                            </ul>
+                        )}
+                    </div>
+
+                    {/* Site Search */}
+                    <div className="flex-1 relative">
+                        <label className="block text-sm ">Site</label>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={site}
+                                onChange={(e) => setSite(e.target.value)}
+                                placeholder="Search site"
+                                className="border p-2 pr-10 rounded w-full"
+                                onFocus={() => setShowSite(true)}
+                                onBlur={() => setTimeout(() => setShowSite(false), 150)}
+                            />
+                            {site && (
+                                <button
+                                    onClick={() => setSite("")}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-red-500"
+                                    type="button"
+                                >
+                                    &times;
+                                </button>
+                            )}
+                        </div>
+                        {showSite && (
+                            <ul className="absolute z-10 w-full max-h-40 overflow-y-auto bg-white border mt-1 rounded shadow">
+                                {uniqueSites
+                                    .filter((s) => s.toLowerCase().includes(site.toLowerCase()))
+                                    .map((s) => (
+                                        <li
+                                            key={s}
+                                            className="px-3 py-1 hover:bg-blue-100 cursor-pointer"
+                                            onClick={() => {
+                                                setSite(s);
+                                                setShowSite(false);
+                                            }}
+                                        >
+                                            {s}
+                                        </li>
+                                    ))}
+                            </ul>
+                        )}
                     </div>
                 </div>
             </div>
 
-            {error && <p className="text-red-500">{error}</p>}
+            {error && <p className="text-red-600">{error}</p>}
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 <MetricCard
-                    title="Gross Revenue"
-                    value={`$${totals.adServerAllRevenueGross.toFixed(2)}`}
+                    title="Revenue"
+                    value={`$${formatNumber(derivedTotals.revenue)}`}
                     Icon={DollarLineIcon}
                     trend="up"
-                    change="–"
                 />
                 <MetricCard
-                    title="Total AdX Clicks"
-                    value={totals.adxLineItemClicks.toLocaleString()}
+                    title="Clicks"
+                    value={formatNumber(derivedTotals.clicks)}
                     Icon={MailIcon}
                     trend="up"
-                    change="–"
                 />
                 <MetricCard
-                    title="AdX Impressions"
-                    value={totals.adxLineItemImpressions.toLocaleString()}
+                    title="Impressions"
+                    value={formatNumber(derivedTotals.impressions)}
                     Icon={EyeIcon}
                     trend="down"
-                    change="–"
                 />
                 <MetricCard
                     title="CTR"
-                    value={`${totals.adxLineItemCtr.toFixed(2)}%`}
+                    value={`${derivedTotals.ctr.toFixed(2)}%`}
                     Icon={TableIcon}
                     trend="up"
-                    change="–"
                 />
             </div>
 
-
-            <AdManagerSites sites={sites} loading={sitesLoading} error={sitesError} />
-
             <ReportListManager
-                rows={filteredRows}
+                rows={filtered}
                 headers={[
                     "Date",
-                    // "Ad Unit",
                     "Site",
-                    "Country",
-                    "adxCostPerClick",
-                    "adxLineItemClicks",
-                    "adxLineItemImpressions",
-                    "adxLineItemCtr",
-                    "adServerAllRevenueGross",
-                    "activeViewViewableRate",
-                    "totalLineItemClicks"
+                    "Ad Exchange Impressions",
+                    "Ad Exchange Clicks",
+                    "Ad Exchange Revenue ($)",
+                    "Ad Exchange eCPM ($)",
+                    "Ad Exchange CTR (%)",
+                    "Ad Exchange CPC ($)",
                 ]}
-                dateRange={getDateRangeLabel(dateRange, startDate, endDate)}
-                totals={totals}
+                dateRange={getDateRangeLabel(dateRange, start, end)}
+                totals={{
+                    adxExchangeLineItemLevelImpressions: derivedTotals.impressions,
+                    adxExchangeLineItemLevelClicks: derivedTotals.clicks,
+                    adxExchangeLineItemLevelRevenue: derivedTotals.revenue,
+                    adxExchangeLineItemLevelCtr: derivedTotals.ctr,
+                    adxExchangeLineItemLevelAverageECPM: derivedTotals.averageECPM,
+                    adxExchangeCostPerClick: derivedTotals.costPerClick,
+                }}
             />
-
-        </div>
-    );
-}
-
-function MetricCard({ title, value, Icon, trend, change }: MetricCardProps) {
-    return (
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
-            <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl dark:bg-gray-800">
-                <Icon className="text-gray-800 size-6 dark:text-white/90" />
-            </div>
-            <div className="flex items-end justify-between mt-5">
-                <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">{title}</span>
-                    <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">{value}</h4>
-                </div>
-                <Badge color={trend === "up" ? "success" : "error"}>
-                    {trend === "up" ? <ArrowUpIcon /> : <ArrowDownIcon />}
-                    {change}
-                </Badge>
-            </div>
         </div>
     );
 }

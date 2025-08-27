@@ -29,6 +29,10 @@ export default function ReportListManager({
     dateRange,
     totals,
 }: ReportListManagerProps) {
+
+
+    console.log(totals, "totals")
+
     const [sortConfig, setSortConfig] = useState<{
         key: string;
         direction: "asc" | "desc";
@@ -43,16 +47,13 @@ export default function ReportListManager({
     // Map headers to actual data keys
     const headerKeyMap: Record<string, string> = {
         Date: "reportDate",
-        // "Ad Unit": "adUnit",
         Site: "site",
-        Country: "country",
-        adxCostPerClick: "adxCostPerClick",
-        adxLineItemClicks: "adxLineItemClicks",
-        adxLineItemImpressions: "adxLineItemImpressions",
-        adxLineItemCtr: "adxLineItemCtr",
-        adServerAllRevenueGross: "adServerAllRevenueGross",
-        activeViewViewableRate: "activeViewViewableRate",
-        totalLineItemClicks: "totalLineItemClicks",
+        "Ad Exchange Impressions": "adxExchangeLineItemLevelImpressions",
+        "Ad Exchange Clicks": "adxExchangeLineItemLevelClicks",
+        "Ad Exchange Revenue ($)": "adxExchangeLineItemLevelRevenue",
+        "Ad Exchange eCPM ($)": "adxExchangeLineItemLevelAverageECPM",
+        "Ad Exchange CTR (%)": "adxExchangeLineItemLevelCtr",
+        "Ad Exchange CPC ($)": "adxExchangeCostPerClick",
     };
 
     // Helper to get data key from header
@@ -89,31 +90,15 @@ export default function ReportListManager({
         return sortedRows.slice(start, start + rowsPerPage);
     }, [sortedRows, currentPage]);
 
-    // Render cell values with formatting
-    const getCellValue = (row: AdManagerRow, header: string) => {
-        const key = getKeyFromHeader(header);
-        const value = row[key];
-
-        if (key === "reportDate" && typeof value === "string") {
-            return new Date(value).toLocaleDateString();
-        }
-
-        if (typeof value === "number") {
-            return Number.isFinite(value) ? value.toLocaleString() : "-";
-        }
-
-        return value ?? "-";
-    };
-
     return (
-        <div className="mt-6 w-full max-w-full overflow-x-auto">
+        <div className="mt-6 w-full max-w-[1182px] overflow-x-auto">
+
             <h4 className="text-md font-semibold text-gray-700 dark:text-white/80 mb-3">
                 Detailed Ad Manager Reports ({dateRange})
             </h4>
-
-            <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm">
-                <table className="min-w-[1200px] border-collapse table-fixed w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
+            <div className="relative overflow-x-auto rounded-xl border border-gray-200 shadow-sm max-w-full">
+                <table className="min-w-[1000px] w-full border-collapse table-auto">
+                    <thead className="bg-gray-50 dark:bg-gray-800 top-0 z-10">
                         <tr className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-left">
                             {headers.map((header, i) => {
                                 const key = getKeyFromHeader(header);
@@ -140,50 +125,165 @@ export default function ReportListManager({
                     </thead>
 
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                        {paginatedRows.length > 0 ? (
-                            paginatedRows.map((row, i) => (
-                                <tr
-                                    key={i}
-                                    className={`transition-colors ${i % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800"
-                                        } hover:bg-blue-50 dark:hover:bg-gray-700`}
-                                >
-                                    {headers.map((header, j) => (
+                        {paginatedRows.map((row, i) => (
+                            <tr
+                                key={i}
+                                className={`transition-colors ${i % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800"
+                                    } hover:bg-blue-50 dark:hover:bg-gray-700`}
+                            >
+                                {headers.map((header, j) => {
+                                    const key = getKeyFromHeader(header);
+
+                                    // raw data
+                                    const rawValue = row[key];
+
+                                    let displayValue = "-";
+
+                                    // Format Date
+                                    if (key === "reportDate" && rawValue) {
+                                        displayValue = new Date(rawValue).toLocaleDateString();
+                                    }
+                                    // Calculate CTR dynamically
+                                    else if (key === "adxExchangeLineItemLevelCtr") {
+                                        const impressions = row["adxExchangeLineItemLevelImpressions"];
+                                        const clicks = row["adxExchangeLineItemLevelClicks"];
+
+                                        if (
+                                            typeof impressions === "number" &&
+                                            impressions > 0 &&
+                                            typeof clicks === "number"
+                                        ) {
+                                            const ctr = (clicks / impressions) * 100;
+                                            displayValue = ctr.toFixed(2) + "%";
+                                        } else {
+                                            displayValue = "0.00%";
+                                        }
+                                    }
+                                    // Calculate and format eCPM dynamically
+                                    else if (key === "adxExchangeLineItemLevelAverageECPM") {
+                                        const revenue = row["adxExchangeLineItemLevelRevenue"];
+                                        const impressions = row["adxExchangeLineItemLevelImpressions"];
+                                        if (
+                                            typeof revenue === "number" &&
+                                            typeof impressions === "number" &&
+                                            impressions > 0
+                                        ) {
+                                            const eCPM = (revenue / impressions) * 1000;
+                                            displayValue = `$${eCPM.toLocaleString(undefined, {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            })}`;
+                                        } else {
+                                            displayValue = "$0.00";
+                                        }
+                                    }
+                                    // Format currency fields (revenue, CPC) properly
+                                    else if (
+                                        ["adxExchangeLineItemLevelRevenue", "adxExchangeCostPerClick"].includes(
+                                            key
+                                        )
+                                    ) {
+                                        if (typeof rawValue === "number") {
+                                            displayValue = `$${rawValue.toLocaleString(undefined, {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            })}`;
+                                        }
+                                    }
+                                    // Format impressions, clicks as integer with commas
+                                    else if (
+                                        ["adxExchangeLineItemLevelImpressions", "adxExchangeLineItemLevelClicks"].includes(
+                                            key
+                                        )
+                                    ) {
+                                        if (typeof rawValue === "number") {
+                                            displayValue = rawValue.toLocaleString();
+                                        }
+                                    }
+                                    // Other numbers fallback
+                                    else if (typeof rawValue === "number") {
+                                        displayValue = rawValue.toString();
+                                    }
+                                    // Strings fallback
+                                    else if (typeof rawValue === "string") {
+                                        displayValue = rawValue;
+                                    }
+
+                                    return (
                                         <td
                                             key={j}
                                             className="px-2 md:px-4 py-2 text-sm border text-gray-700 dark:text-gray-300 whitespace-nowrap"
                                         >
-                                            {getCellValue(row, header)}
+                                            {displayValue}
                                         </td>
-                                    ))}
-                                </tr>
-                            ))
-                        ) : (
-                            <tr>
-                                <td
-                                    colSpan={headers.length}
-                                    className="text-center py-4 text-gray-500 dark:text-gray-400"
-                                >
-                                    No data for {dateRange}
-                                </td>
+                                    );
+                                })}
                             </tr>
-                        )}
+                        ))}
 
-                        {/* Totals Row */}
                         {totals && (
                             <tr className="bg-blue-100 dark:bg-blue-900 font-semibold">
                                 {headers.map((header, i) => {
                                     const key = getKeyFromHeader(header);
                                     const totalValue = totals[key];
+
+                                    let displayValue = "";
+
+                                    if (i === 0) {
+                                        displayValue = "TOTAL";
+                                    }
+                                    // Calculate total eCPM = (totalRevenue / totalImpressions) * 1000
+                                    else if (key === "adxExchangeLineItemLevelAverageECPM") {
+                                        const totalRevenue = totals["adxExchangeLineItemLevelRevenue"] || 0;
+                                        const totalImpressions = totals["adxExchangeLineItemLevelImpressions"] || 0;
+                                        if (totalImpressions > 0) {
+                                            const totalECPM = (totalRevenue / totalImpressions) * 1000;
+                                            displayValue = `$${totalECPM.toLocaleString(undefined, {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            })}`;
+                                        } else {
+                                            displayValue = "$0.00";
+                                        }
+                                    }
+                                    // Format total revenue, CPC with $ and decimals
+                                    else if (
+                                        ["adxExchangeLineItemLevelRevenue", "adxExchangeCostPerClick"].includes(key)
+                                    ) {
+                                        displayValue = totalValue
+                                            ? `$${totalValue.toLocaleString(undefined, {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            })}`
+                                            : "-";
+                                    }
+                                    // Format total impressions, clicks with commas
+                                    else if (
+                                        ["adxExchangeLineItemLevelImpressions", "adxExchangeLineItemLevelClicks"].includes(
+                                            key
+                                        )
+                                    ) {
+                                        displayValue = totalValue ? totalValue.toLocaleString() : "-";
+                                    }
+                                    // Calculate total CTR = (totalClicks / totalImpressions) * 100
+                                    else if (key === "adxExchangeLineItemLevelCtr") {
+                                        const totalClicks = totals["adxExchangeLineItemLevelClicks"] || 0;
+                                        const totalImpressions = totals["adxExchangeLineItemLevelImpressions"] || 0;
+                                        if (totalImpressions > 0) {
+                                            displayValue = ((totalClicks / totalImpressions) * 100).toFixed(2) + "%";
+                                        } else {
+                                            displayValue = "0.00%";
+                                        }
+                                    } else if (typeof totalValue === "number") {
+                                        displayValue = totalValue.toString();
+                                    }
+
                                     return (
                                         <td
                                             key={i}
                                             className="px-2 md:px-4 py-2 border border-blue-200 text-gray-700 dark:text-gray-300 whitespace-nowrap"
                                         >
-                                            {i === 0
-                                                ? "TOTAL"
-                                                : typeof totalValue === "number"
-                                                    ? totalValue.toLocaleString()
-                                                    : ""}
+                                            {displayValue}
                                         </td>
                                     );
                                 })}
