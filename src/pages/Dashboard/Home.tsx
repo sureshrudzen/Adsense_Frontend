@@ -14,8 +14,7 @@ export default function Home() {
     <>
       <PageMeta
         title="Adsens Dashboard"
-        description="This is React.js Ecommerce Dashboard page for TailAdmin - React.js Tailwind CSS Admin Dashboard Template"
-      />
+        description="Monitor your AdSense and Google Ad Manager performance in Rudzen’s unified dashboard with real-time analytics, revenue, impressions, CTR, and more." />
       <div className="">
         <div className="">
           <DashboardKpi />

@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
-    ArrowDownIcon,
-    ArrowUpIcon,
     DollarLineIcon,
     EyeIcon,
     MailIcon,
     TableIcon,
 } from "../../icons";
-import Badge from "../ui/badge/Badge";
+import ExportPdfButton from "./ExportToPdf"
+import { CircleFadingArrowUp, Camera } from 'lucide-react';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useDispatch, useSelector } from "react-redux";
@@ -15,6 +14,9 @@ import { AppDispatch, RootState } from "../../store";
 import { fetchReport } from "../../features/adManager/reportAdManagerSlice";
 import { useSearchParams } from "react-router-dom";
 import ReportListManager from "./ReportListManager";
+import DateRangeFilter from "../common/adManager/DateRangeFilter";
+import WebsiteFilter from "../common/adManager/WebsiteFilter";
+import SelectedSites from "../common/adManager/SelectedSites";
 
 // Date formatting helper
 function formatDate(d: Date) {
@@ -36,45 +38,57 @@ function getDateRangeLabel(range: string, start: Date | null, end: Date | null) 
     return map[range] ?? range;
 }
 
-// Metric display card
+// Enhanced Metric display card
 function MetricCard({
     title,
     value,
     Icon,
-    trend,
+    gradient,
 }: {
     title: string;
-    value: string;
+    value: string | number;
     Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
     trend: "up" | "down";
+    gradient: string;
 }) {
     return (
-        <div className="rounded-2xl border p-5 bg-white dark:bg-gray-800">
-            <Icon className="w-6 h-6 text-gray-700 dark:text-white" />
-            <div className="mt-2 flex justify-between items-end">
-                <div>
-                    <div className="text-sm text-gray-500">{title}</div>
-                    <div className="font-bold text-lg">{value}</div>
+        <div className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-1 md:p-4 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-600 w-full sm:w-auto">
+            {/* Background gradient effect */}
+            <div
+                className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300 bg-gradient-to-br ${gradient}`}
+            ></div>
+
+            <div className="relative z-10">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className={`p-2 rounded-xl bg-gradient-to-br ${gradient} shadow-lg`}>
+                        <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                    </div>
+                    <div className="flex flex-col items-end sm:items-start">
+                        <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 mb-0.5 sm:mb-1">
+                            {title}
+                        </p>
+                        <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">
+                            {value}
+                        </p>
+                    </div>
                 </div>
-                <Badge color={trend === "up" ? "success" : "error"}>
-                    {trend === "up" ? <ArrowUpIcon /> : <ArrowDownIcon />}
-                </Badge>
             </div>
         </div>
     );
 }
 
+
 export default function MainLayoutManager() {
     const [searchParams] = useSearchParams();
     const networkId = searchParams.get("networkId") || "";
     const dispatch = useDispatch<AppDispatch>();
-    const { data, error } = useSelector((state: RootState) => state.admanagerReport);
+    const { data, error, loading } = useSelector((state: RootState) => state.admanagerReport);
 
     const [dateRange, setDateRange] = useState("TODAY");
     const [range, setRange] = useState<[Date | null, Date | null]>([null, null]);
-    const [country, setCountry] = useState("");
-    const [showCountry, setShowCountry] = useState(false);
-    const [site, setSite] = useState("");
+
+    const [selectedSites, setSelectedSites] = useState<string[]>([]);
+    const [siteQuery, setSiteQuery] = useState("");
     const [showSite, setShowSite] = useState(false);
 
     const [start, end] = range;
@@ -86,9 +100,9 @@ export default function MainLayoutManager() {
     }, [dispatch, networkId, dateRange]);
 
     const rows = data?.rows || [];
-    const uniqueCountries = Array.from(new Set(rows.map((r) => r.country))).filter(Boolean);
-    const uniqueSites = Array.from(new Set(rows.map((r) => r.site))).filter(Boolean);
-
+    const uniqueSites = Array.from(new Set(rows.map((r) => r.site?.toLowerCase()))).filter(Boolean);
+    console.log(rows, "rows")
+    console.log(uniqueSites, "uniqueSites")
     const normalize = (d: Date) => new Date(d.setHours(0, 0, 0, 0));
     const today = normalize(new Date());
     const yesterday = new Date(today);
@@ -99,6 +113,11 @@ export default function MainLayoutManager() {
     last30.setDate(today.getDate() - 29);
 
     const filtered = useMemo(() => {
+        const matchSite = (r: typeof rows[number]) =>
+            selectedSites.length > 0
+                ? selectedSites.includes(r.site?.toLowerCase() || "")
+                : true;
+
         if (dateRange === "ALL" || dateRange === "CUSTOM") {
             return rows.filter((r) => {
                 const d = normalize(new Date(r.reportDate));
@@ -106,23 +125,12 @@ export default function MainLayoutManager() {
                 if (dateRange === "CUSTOM" && start && end) {
                     inRange = d >= normalize(start) && d <= normalize(end);
                 }
-                const matchCountry = country
-                    ? r.country?.toLowerCase() === country.toLowerCase()
-                    : true;
-                const matchSite = site ? r.site?.toLowerCase() === site.toLowerCase() : true;
-                return inRange && matchCountry && matchSite;
+                return inRange && matchSite(r);
             });
         }
 
-        // For fixed dateRange values, backend returns filtered data by date; only filter country/site here
-        return rows.filter((r) => {
-            const matchCountry = country
-                ? r.country?.toLowerCase() === country.toLowerCase()
-                : true;
-            const matchSite = site ? r.site?.toLowerCase() === site.toLowerCase() : true;
-            return matchCountry && matchSite;
-        });
-    }, [rows, dateRange, start, end, country, site]);
+        return rows.filter((r) => matchSite(r));
+    }, [rows, dateRange, start, end, selectedSites]);
 
     // Calculate totals from filtered data
     const totals = filtered.reduce(
@@ -130,16 +138,22 @@ export default function MainLayoutManager() {
             const impressions = r.adxExchangeLineItemLevelImpressions ?? 0;
             const clicks = r.adxExchangeLineItemLevelClicks ?? 0;
             const revenue = r.adxExchangeLineItemLevelRevenue ?? 0;
-
+            const reportDate = r.reportDate ? new Date(r.reportDate) : null;
             acc.impressions += impressions;
             acc.clicks += clicks;
             acc.revenue += revenue;
+
+            if (reportDate && (!acc.reportDate || reportDate > acc.reportDate)) {
+                acc.reportDate = reportDate;
+            }
+
             return acc;
         },
         {
             impressions: 0,
             clicks: 0,
             revenue: 0,
+            reportDate: null as Date | null,
         }
     );
 
@@ -148,6 +162,7 @@ export default function MainLayoutManager() {
         impressions: totals.impressions,
         clicks: totals.clicks,
         revenue: totals.revenue,
+        reportDate: totals.reportDate,
         ctr: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
         averageECPM:
             totals.impressions > 0
@@ -158,189 +173,176 @@ export default function MainLayoutManager() {
     };
 
     function formatNumber(num: number) {
-        if (num >= 1e9) return (num / 1e9).toFixed(2);
-        if (num >= 1e6) return (num / 1e6).toFixed(2);
-        if (num >= 1e3) return (num / 1e3).toFixed(2);
+        if (num >= 1e9) return (num / 1e9).toFixed(2) + "B";
+        if (num >= 1e6) return (num / 1e6).toFixed(2) + "M";
+        if (num >= 1e3) return (num / 1e3).toFixed(2) + "K";
         return num.toFixed(2);
     }
+
+    const refreshData = () => {
+        if (networkId) {
+            dispatch(fetchReport({ networkId, dateRange }));
+        }
+    };
     return (
-        <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">
-                    Ad Manager Performance Report ({getDateRangeLabel(dateRange, start, end)})
-                </h3>
-                <div className="space-y-4 md:flex md:space-y-0 md:space-x-4">
-                    {/* Date Range Selector */}
-                    <div className="flex-1">
-                        <label className="block text-sm">Date Range</label>
-                        <select
-                            value={dateRange}
-                            onChange={(e) => setDateRange(e.target.value)}
-                            className="border p-2 rounded w-full"
+        <div>
+            <div className="max-w-7xl mx-auto space-y-2">
+                {/* Enhanced Header */}
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+                        {/* Icon */}
+                        <div className="self-start sm:self-auto p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-lg">
+                            <TableIcon className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+                        </div>
+                        {/* Title and Subtitle */}
+                        <div>
+                            <h3 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent">
+                                Ad Manager Performance
+                            </h3>
+                            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
+                                {getDateRangeLabel(dateRange, start, end)} • Real-time Analytics
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={refreshData}
+                            disabled={loading}
+                            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {["ALL", "TODAY", "YESTERDAY", "LAST_7_DAYS", "LAST_30_DAYS", "CUSTOM"].map(
-                                (opt) => (
-                                    <option key={opt} value={opt}>
-                                        {getDateRangeLabel(opt, start, end)}
-                                    </option>
-                                )
-                            )}
-                        </select>
-                    </div>
-                    {dateRange === "CUSTOM" && (
-                        <div className="flex-1">
-                            <label className="block text-sm ">Select Range</label>
-                            <DatePicker
-                                selectsRange
-                                startDate={start}
-                                endDate={end}
-                                onChange={(u) => setRange(u as [Date | null, Date | null])}
-                                isClearable
-                                placeholderText="Choose date range"
-                                className="border p-2 rounded w-full"
+                            <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <span className="text-sm font-medium">{loading ? 'Refreshing...' : 'Refresh'}</span>
+                        </button>
+                        <div>
+                            <ExportPdfButton
+                                headers={[
+                                    "Date",
+                                    "Site",
+                                    "Ad Exchange Impressions",
+                                    "Ad Exchange Clicks",
+                                    "Ad Exchange Revenue ($)",
+                                    "Ad Exchange Average eCPM ($)",
+                                    "Ad Exchange CTR (%)",
+                                    "Ad Exchange CPC ($)",
+                                ]}
+                                rows={filtered}
+                                totals={{
+                                    adxExchangeLineItemLevelImpressions: derivedTotals.impressions,
+                                    adxExchangeLineItemLevelClicks: derivedTotals.clicks,
+                                    adxExchangeLineItemLevelRevenue: derivedTotals.revenue,
+                                    adxExchangeLineItemLevelCtr: derivedTotals.ctr,
+                                    adxExchangeLineItemLevelAverageECPM: derivedTotals.averageECPM,
+                                    adxExchangeCostPerClick: derivedTotals.costPerClick,
+                                    reportDate: derivedTotals.reportDate ?? null,
+                                }}
+                                title="Ad Manager Report"
+                                dateRangeLabel={getDateRangeLabel(dateRange, start, end)}
+                                fileName={`admanager_${dateRange.toLowerCase()}.pdf`}
                             />
                         </div>
-                    )}
-
-                    {/* Country Search */}
-                    <div className="flex-1 relative">
-                        <label className="block text-sm ">Country</label>
-                        <div className="relative">
-                            <input
-                                type="text"
-                                value={country}
-                                onChange={(e) => setCountry(e.target.value)}
-                                placeholder="Search country"
-                                className="border p-2 pr-10 rounded w-full"
-                                onFocus={() => setShowCountry(true)}
-                                onBlur={() => setTimeout(() => setShowCountry(false), 150)}
-                            />
-                            {country && (
-                                <button
-                                    onClick={() => setCountry("")}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-red-500"
-                                    type="button"
-                                >
-                                    &times;
-                                </button>
-                            )}
-                        </div>
-                        {showCountry && (
-                            <ul className="absolute z-10 w-full max-h-40 overflow-y-auto bg-white border mt-1 rounded shadow">
-                                {uniqueCountries
-                                    .filter((c) => c.toLowerCase().includes(country.toLowerCase()))
-                                    .map((c) => (
-                                        <li
-                                            key={c}
-                                            className="px-3 py-1 hover:bg-blue-100 cursor-pointer"
-                                            onClick={() => {
-                                                setCountry(c);
-                                                setShowCountry(false);
-                                            }}
-                                        >
-                                            {c}
-                                        </li>
-                                    ))}
-                            </ul>
-                        )}
-                    </div>
-
-                    {/* Site Search */}
-                    <div className="flex-1 relative">
-                        <label className="block text-sm ">Site</label>
-                        <div className="relative">
-                            <input
-                                type="text"
-                                value={site}
-                                onChange={(e) => setSite(e.target.value)}
-                                placeholder="Search site"
-                                className="border p-2 pr-10 rounded w-full"
-                                onFocus={() => setShowSite(true)}
-                                onBlur={() => setTimeout(() => setShowSite(false), 150)}
-                            />
-                            {site && (
-                                <button
-                                    onClick={() => setSite("")}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-red-500"
-                                    type="button"
-                                >
-                                    &times;
-                                </button>
-                            )}
-                        </div>
-                        {showSite && (
-                            <ul className="absolute z-10 w-full max-h-40 overflow-y-auto bg-white border mt-1 rounded shadow">
-                                {uniqueSites
-                                    .filter((s) => s.toLowerCase().includes(site.toLowerCase()))
-                                    .map((s) => (
-                                        <li
-                                            key={s}
-                                            className="px-3 py-1 hover:bg-blue-100 cursor-pointer"
-                                            onClick={() => {
-                                                setSite(s);
-                                                setShowSite(false);
-                                            }}
-                                        >
-                                            {s}
-                                        </li>
-                                    ))}
-                            </ul>
-                        )}
                     </div>
                 </div>
+                {/* Error Display */}
+                {error && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-1">
+                        <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
+                    </div>
+                )}
+                {/* Enhanced Metrics Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6 md:gap-8 lg:gap-10 xl:gap-12 p-2 sm:p-4">
+                    <MetricCard
+                        title="Revenue"
+                        value={`$${formatNumber(derivedTotals.revenue / 1_000_000)}`}
+                        Icon={DollarLineIcon}
+                        trend="up"
+                        gradient="from-emerald-500 to-green-600"
+                    />
+                    <MetricCard
+                        title="Average eCPM"
+                        value={`$${formatNumber(derivedTotals.averageECPM / 1_000_000)}`}
+                        Icon={Camera}
+                        trend="up"
+                        gradient="from-pink-500 to-yellow-600"
+                    />
+                    <MetricCard
+                        title="Clicks"
+                        value={formatNumber(derivedTotals.clicks)}
+                        Icon={MailIcon}
+                        trend="up"
+                        gradient="from-blue-500 to-cyan-600"
+                    />
+                    <MetricCard
+                        title="Impressions"
+                        value={formatNumber(derivedTotals.impressions)}
+                        Icon={CircleFadingArrowUp}
+                        trend="down"
+                        gradient="from-purple-500 to-pink-600"
+                    />
+                    <MetricCard
+                        title="CTR"
+                        value={`${derivedTotals.ctr.toFixed(2)}%`}
+                        Icon={TableIcon}
+                        trend="up"
+                        gradient="from-orange-500 to-red-600"
+                    />
+                </div>
+
+                {/* Enhanced Filter Section */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Date Range Section */}
+                        <DateRangeFilter {...{ dateRange, setDateRange, start, end, setRange, getDateRangeLabel }} />
+                        {/* Site Search Section */}
+                        <WebsiteFilter {...{ siteQuery, setSiteQuery, uniqueSites, selectedSites, setSelectedSites, showSite, setShowSite }} />
+                        <div className=" items-end gap-3 ">
+                            <div className="flex justify-end items-end px-2">
+                                <button
+                                    onClick={() => {
+                                        setDateRange("TODAY");
+                                        setRange([null, null]);
+                                        setSelectedSites([]);
+                                        setSiteQuery("");
+                                    }}
+                                    className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium transition-colors"
+                                >
+                                    Reset All Filters
+                                </button>
+                            </div>
+                        </div>
+                        {/* Enhanced Selected Sites Section */}
+                    </div>
+                    <SelectedSites {...{ selectedSites, setSelectedSites }} />
+                </div>
+
+                {/* Report List Manager */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-4">
+                    <ReportListManager
+                        rows={filtered}
+                        headers={[
+                            "Date",
+                            "Site",
+                            "Ad Exchange Impressions",
+                            "Ad Exchange Clicks",
+                            "Ad Exchange Revenue ($)",
+                            "Ad Exchange Average eCPM ($)",
+                            "Ad Exchange CTR (%)",
+                            "Ad Exchange CPC ($)",
+                        ]}
+                        dateRange={getDateRangeLabel(dateRange, start, end)}
+                        totals={{
+                            reportDate: derivedTotals.reportDate,
+                            adxExchangeLineItemLevelImpressions: derivedTotals.impressions,
+                            adxExchangeLineItemLevelClicks: derivedTotals.clicks,
+                            adxExchangeLineItemLevelRevenue: derivedTotals.revenue,
+                            adxExchangeLineItemLevelCtr: derivedTotals.ctr,
+                            adxExchangeLineItemLevelAverageECPM: derivedTotals.averageECPM,
+                            adxExchangeCostPerClick: derivedTotals.costPerClick,
+                        }}
+                    />
+                </div>
             </div>
-
-            {error && <p className="text-red-600">{error}</p>}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                <MetricCard
-                    title="Revenue"
-                    value={`$${formatNumber(derivedTotals.revenue)}`}
-                    Icon={DollarLineIcon}
-                    trend="up"
-                />
-                <MetricCard
-                    title="Clicks"
-                    value={derivedTotals.clicks}
-                    Icon={MailIcon}
-                    trend="up"
-                />
-                <MetricCard
-                    title="Impressions"
-                    value={derivedTotals.impressions}
-                    Icon={EyeIcon}
-                    trend="down"
-                />
-                <MetricCard
-                    title="CTR"
-                    value={`${derivedTotals.ctr.toFixed(2)}%`}
-                    Icon={TableIcon}
-                    trend="up"
-                />
-            </div>
-
-            <ReportListManager
-                rows={filtered}
-                headers={[
-                    "Date",
-                    "Site",
-                    "Ad Exchange Impressions",
-                    "Ad Exchange Clicks",
-                    "Ad Exchange Revenue ($)",
-                    "Ad Exchange Average eCPM ($)",
-                    "Ad Exchange CTR (%)",
-                    "Ad Exchange CPC ($)",
-                ]}
-                dateRange={getDateRangeLabel(dateRange, start, end)}
-                totals={{
-                    adxExchangeLineItemLevelImpressions: derivedTotals.impressions,
-                    adxExchangeLineItemLevelClicks: derivedTotals.clicks,
-                    adxExchangeLineItemLevelRevenue: derivedTotals.revenue,
-                    adxExchangeLineItemLevelCtr: derivedTotals.ctr,
-                    adxExchangeLineItemLevelAverageECPM: derivedTotals.averageECPM,
-                    adxExchangeCostPerClick: derivedTotals.costPerClick,
-                }}
-            />
         </div>
     );
 }

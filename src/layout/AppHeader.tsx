@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+
 import { Link } from "react-router";
 import { useSidebar } from "../context/SidebarContext";
 import { ThemeToggleButton } from "../components/common/ThemeToggleButton";
@@ -69,9 +70,8 @@ const AppHeader: React.FC = () => {
           </button>
 
           {/* Logo */}
-          <Link to="/" className="lg:hidden">
-            <img className="dark:hidden" src="./images/logo/logo.svg" alt="Logo" />
-            <img className="hidden dark:block" src="./images/logo/logo-dark.svg" alt="Logo" />
+          <Link to="/" className="lg:hidden flex items-center gap-2 text-blue-600 hover:text-blue-800 font-semibold">
+            Rudzen Tech Pvt Ltd
           </Link>
         </div>
 

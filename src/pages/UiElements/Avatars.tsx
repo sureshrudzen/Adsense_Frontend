@@ -6,10 +6,10 @@ import PageMeta from "../../components/common/PageMeta";
 export default function Avatars() {
   return (
     <>
-      <PageMeta
-        title="React.js Avatars Dashboard | TailAdmin - React.js Admin Dashboard Template"
-        description="This is React.js Avatars Dashboard page for TailAdmin - React.js Tailwind CSS Admin Dashboard Template"
-      />
+       <PageMeta
+    title="Rudzen Ads Dashboard | AdSense & Ad Manager Insights"
+    description="Monitor your AdSense and Google Ad Manager performance in Rudzen’s unified dashboard with real-time analytics, revenue, impressions, CTR, and more."
+  />
       <PageBreadcrumb pageTitle="Avatars" />
       <div className="space-y-5 sm:space-y-6">
         <ComponentCard title="Default Avatar">
