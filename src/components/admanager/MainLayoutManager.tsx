@@ -301,13 +301,13 @@ export default function MainLayoutManager() {
                 />
                 <MetricCard
                     title="Clicks"
-                    value={formatNumber(derivedTotals.clicks)}
+                    value={derivedTotals.clicks}
                     Icon={MailIcon}
                     trend="up"
                 />
                 <MetricCard
                     title="Impressions"
-                    value={formatNumber(derivedTotals.impressions)}
+                    value={derivedTotals.impressions}
                     Icon={EyeIcon}
                     trend="down"
                 />
@@ -327,7 +327,7 @@ export default function MainLayoutManager() {
                     "Ad Exchange Impressions",
                     "Ad Exchange Clicks",
                     "Ad Exchange Revenue ($)",
-                    "Ad Exchange eCPM ($)",
+                    "Ad Exchange Average eCPM ($)",
                     "Ad Exchange CTR (%)",
                     "Ad Exchange CPC ($)",
                 ]}

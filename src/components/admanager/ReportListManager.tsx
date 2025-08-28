@@ -31,8 +31,6 @@ export default function ReportListManager({
 }: ReportListManagerProps) {
 
 
-    console.log(totals, "totals")
-
     const [sortConfig, setSortConfig] = useState<{
         key: string;
         direction: "asc" | "desc";
@@ -51,7 +49,7 @@ export default function ReportListManager({
         "Ad Exchange Impressions": "adxExchangeLineItemLevelImpressions",
         "Ad Exchange Clicks": "adxExchangeLineItemLevelClicks",
         "Ad Exchange Revenue ($)": "adxExchangeLineItemLevelRevenue",
-        "Ad Exchange eCPM ($)": "adxExchangeLineItemLevelAverageECPM",
+        "Ad Exchange Average eCPM ($)": "adxExchangeLineItemLevelAverageECPM",
         "Ad Exchange CTR (%)": "adxExchangeLineItemLevelCtr",
         "Ad Exchange CPC ($)": "adxExchangeCostPerClick",
     };
@@ -89,6 +87,77 @@ export default function ReportListManager({
         const start = (currentPage - 1) * rowsPerPage;
         return sortedRows.slice(start, start + rowsPerPage);
     }, [sortedRows, currentPage]);
+    function formatCurrencyValue(key: string, rawValue: number): string {
+        const currencyKeys = ["adxExchangeLineItemLevelRevenue", "adxExchangeCostPerClick","adxExchangeLineItemLevelAverageECPM"];
+
+        if (currencyKeys.includes(key) && typeof rawValue === "number") {
+            const valueInDollars = rawValue / 1_000_000; // convert micros to dollars
+            return `$${formatNumber(valueInDollars)}`;
+        }
+
+        return formatNumber(rawValue); // fallback for non-currency values
+    }
+
+
+    function formatNumber(num: number): string {
+        if (num >= 1e9) return (num / 1e9).toFixed(2) + "B";
+        if (num >= 1e6) return (num / 1e6).toFixed(2) + "M";
+        if (num >= 1e3) return (num / 1e3).toFixed(2) + "K";
+        return num.toFixed(2);
+    }
+
+    function formatTotalValue(key: string, totals: Record<string, number>): string {
+        const value = totals[key];
+
+        if (key === "adxExchangeLineItemLevelAverageECPM") {
+            const revenueMicros = totals["adxExchangeLineItemLevelRevenue"] || 0;
+            const impressions = totals["adxExchangeLineItemLevelImpressions"] || 0;
+            const revenueDollars = revenueMicros / 1_000_000; // convert micros to dollars
+
+            const eCPM = impressions > 0 ? (revenueDollars / impressions) * 1000 : 0;
+            return `$${formatNumber(eCPM)}`;
+        }
+
+
+        if (key === "adxExchangeLineItemLevelCtr") {
+            const clicks = totals["adxExchangeLineItemLevelClicks"] || 0;
+            const impressions = totals["adxExchangeLineItemLevelImpressions"] || 0;
+            const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+            return `${ctr.toFixed(2)}%`;
+        }
+
+        if (key === "adxExchangeLineItemLevelRevenue") {
+            return typeof value === "number" ? `$${formatNumber(value/1_000_000)}` : "$0.00";
+        }
+
+        if (key === "adxExchangeCostPerClick") {
+            const rawRevenue = totals["adxExchangeLineItemLevelRevenue"] || 0;
+            const clicks = totals["adxExchangeLineItemLevelClicks"] || 0;
+
+            const revenue = rawRevenue / 1_000_000; // convert micros to dollars
+            const cpc = clicks > 0 ? revenue / clicks : 0;
+            return `$${formatNumber(cpc)}`;
+        }
+
+
+        if (
+            key === "adxExchangeLineItemLevelImpressions" ||
+            key === "adxExchangeLineItemLevelClicks"
+        ) {
+            return typeof value === "number" ? value.toLocaleString() : "-";
+        }
+
+        if (typeof value === "number") {
+            return value.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        }
+
+        return "-";
+    }
+
+
 
     return (
         <div className="mt-6 w-full max-w-[1182px] overflow-x-auto">
@@ -159,35 +228,13 @@ export default function ReportListManager({
                                             displayValue = "0.00%";
                                         }
                                     }
-                                    // Calculate and format eCPM dynamically
-                                    else if (key === "adxExchangeLineItemLevelAverageECPM") {
-                                        const revenue = row["adxExchangeLineItemLevelRevenue"];
-                                        const impressions = row["adxExchangeLineItemLevelImpressions"];
-                                        if (
-                                            typeof revenue === "number" &&
-                                            typeof impressions === "number" &&
-                                            impressions > 0
-                                        ) {
-                                            const eCPM = (revenue / impressions) * 1000;
-                                            displayValue = `$${eCPM.toLocaleString(undefined, {
-                                                minimumFractionDigits: 2,
-                                                maximumFractionDigits: 2,
-                                            })}`;
-                                        } else {
-                                            displayValue = "$0.00";
-                                        }
-                                    }
-                                    // Format currency fields (revenue, CPC) properly
                                     else if (
-                                        ["adxExchangeLineItemLevelRevenue", "adxExchangeCostPerClick"].includes(
+                                        ["adxExchangeLineItemLevelRevenue", "adxExchangeCostPerClick", "adxExchangeLineItemLevelAverageECPM"].includes(
                                             key
                                         )
                                     ) {
                                         if (typeof rawValue === "number") {
-                                            displayValue = `$${rawValue.toLocaleString(undefined, {
-                                                minimumFractionDigits: 2,
-                                                maximumFractionDigits: 2,
-                                            })}`;
+                                            displayValue = formatCurrencyValue(key, rawValue);
                                         }
                                     }
                                     // Format impressions, clicks as integer with commas
@@ -197,7 +244,7 @@ export default function ReportListManager({
                                         )
                                     ) {
                                         if (typeof rawValue === "number") {
-                                            displayValue = rawValue.toLocaleString();
+                                            displayValue = rawValue.toString();
                                         }
                                     }
                                     // Other numbers fallback
@@ -220,63 +267,11 @@ export default function ReportListManager({
                                 })}
                             </tr>
                         ))}
-
                         {totals && (
                             <tr className="bg-blue-100 dark:bg-blue-900 font-semibold">
                                 {headers.map((header, i) => {
                                     const key = getKeyFromHeader(header);
-                                    const totalValue = totals[key];
-
-                                    let displayValue = "";
-
-                                    if (i === 0) {
-                                        displayValue = "TOTAL";
-                                    }
-                                    // Calculate total eCPM = (totalRevenue / totalImpressions) * 1000
-                                    else if (key === "adxExchangeLineItemLevelAverageECPM") {
-                                        const totalRevenue = totals["adxExchangeLineItemLevelRevenue"] || 0;
-                                        const totalImpressions = totals["adxExchangeLineItemLevelImpressions"] || 0;
-                                        if (totalImpressions > 0) {
-                                            const totalECPM = (totalRevenue / totalImpressions) * 1000;
-                                            displayValue = `$${totalECPM.toLocaleString(undefined, {
-                                                minimumFractionDigits: 2,
-                                                maximumFractionDigits: 2,
-                                            })}`;
-                                        } else {
-                                            displayValue = "$0.00";
-                                        }
-                                    }
-                                    // Format total revenue, CPC with $ and decimals
-                                    else if (
-                                        ["adxExchangeLineItemLevelRevenue", "adxExchangeCostPerClick"].includes(key)
-                                    ) {
-                                        displayValue = totalValue
-                                            ? `$${totalValue.toLocaleString(undefined, {
-                                                minimumFractionDigits: 2,
-                                                maximumFractionDigits: 2,
-                                            })}`
-                                            : "-";
-                                    }
-                                    // Format total impressions, clicks with commas
-                                    else if (
-                                        ["adxExchangeLineItemLevelImpressions", "adxExchangeLineItemLevelClicks"].includes(
-                                            key
-                                        )
-                                    ) {
-                                        displayValue = totalValue ? totalValue.toLocaleString() : "-";
-                                    }
-                                    // Calculate total CTR = (totalClicks / totalImpressions) * 100
-                                    else if (key === "adxExchangeLineItemLevelCtr") {
-                                        const totalClicks = totals["adxExchangeLineItemLevelClicks"] || 0;
-                                        const totalImpressions = totals["adxExchangeLineItemLevelImpressions"] || 0;
-                                        if (totalImpressions > 0) {
-                                            displayValue = ((totalClicks / totalImpressions) * 100).toFixed(2) + "%";
-                                        } else {
-                                            displayValue = "0.00%";
-                                        }
-                                    } else if (typeof totalValue === "number") {
-                                        displayValue = totalValue.toString();
-                                    }
+                                    let displayValue = i === 0 ? "TOTAL" : formatTotalValue(key, totals);
 
                                     return (
                                         <td
@@ -289,6 +284,7 @@ export default function ReportListManager({
                                 })}
                             </tr>
                         )}
+
                     </tbody>
                 </table>
             </div>
