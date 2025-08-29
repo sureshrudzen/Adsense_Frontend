@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "../../store";
 import {
@@ -7,6 +7,7 @@ import {
   setPage,
   setSearch,
 } from "../../features/adsense/adsenseSlice";
+import { fetchAllSites } from "../../features/sites/sitesSlice";
 import Swal from "sweetalert2";
 import Pagination from "../../components/common/Pagination";
 
@@ -19,7 +20,16 @@ const ConnectAdSenseAccount: React.FC = () => {
   useEffect(() => {
     dispatch(fetchAccounts());
   }, [dispatch]);
+  const {
+    items: sites,
+    loading: sitesLoading,
+    error: sitesError,
+  } = useSelector((state: RootState) => state.sites);
 
+
+useEffect(() => {
+    dispatch(fetchAllSites());
+  }, [dispatch]);
   // ✅ Filter + Pagination (displayName, accountId, email par search)
   const filteredAccounts = accounts.filter(
     (a) =>
@@ -34,7 +44,6 @@ const ConnectAdSenseAccount: React.FC = () => {
     startIndex,
     startIndex + pageSize
   );
-
   // ✅ SweetAlert Delete
   const handleDelete = async (accountId: string) => {
     const result = await Swal.fire({
@@ -69,9 +78,9 @@ const ConnectAdSenseAccount: React.FC = () => {
           <button
             className="px-3 py-2 rounded-lg border shadow-sm disabled:opacity-50 whitespace-nowrap"
             onClick={() =>
-              (window.location.href = `http://localhost:5000/api/auth/google?state=${localStorage.getItem(
-                "token"
-              )}`)
+            (window.location.href = `http://localhost:5000/api/auth/google?state=${localStorage.getItem(
+              "token"
+            )}`)
             }
           >
             Connect New AdSense
@@ -114,33 +123,40 @@ const ConnectAdSenseAccount: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {paginatedAccounts.map((a, i) => (
-                <tr key={a._id || a.accountId} className="hover:bg-gray-50">
-                  <td className="p-2 sm:p-3 border text-center">
-                    {startIndex + i + 1}
-                  </td>
-                  <td className="p-2 sm:p-3 border">
-                    {a.displayName || "AdSense Account"}
-                  </td>
-                  <td className="p-2 sm:p-3 border">{a.email || "—"}</td>
-                  <td className="p-2 sm:p-3 border">{a.accountId}</td>
-                  <td className="p-2 sm:p-3 border text-center space-x-2 sm:space-x-3">
-                    <a
-                      href={`/report?account=${encodeURIComponent(a.accountId)}`}
-                      className="inline-block px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200"
-                    >
-                      View Report
-                    </a>
-                    <button
-                      onClick={() => handleDelete(a.accountId)}
-                      className="inline-block px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-lg bg-red-100 text-red-700 hover:bg-red-200"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {paginatedAccounts.map((a, i) => {
+                // Find the site that matches the accountId
+                const relatedSite = sites.find(site => site.accountId === a.accountId);
+
+                return (
+                  <tr key={a._id || a.accountId} className="hover:bg-gray-50">
+                    <td className="p-2 sm:p-3 border text-center">
+                      {startIndex + i + 1}
+                    </td>
+                    <td className="p-2 sm:p-3 border">
+                      {/* Show the domain if found, else fallback */}
+                      {relatedSite?.domain || "No Domain Found"}
+                    </td>
+                    <td className="p-2 sm:p-3 border">{a.email || "—"}</td>
+                    <td className="p-2 sm:p-3 border">{a.accountId}</td>
+                    <td className="p-2 sm:p-3 border text-center space-x-2 sm:space-x-3">
+                      <a
+                        href={`/report?account=${encodeURIComponent(a.accountId)}`}
+                        className="inline-block px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200"
+                      >
+                        View Report
+                      </a>
+                      <button
+                        onClick={() => handleDelete(a.accountId)}
+                        className="inline-block px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-lg bg-red-100 text-red-700 hover:bg-red-200"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
+
           </table>
         </div>
       )}

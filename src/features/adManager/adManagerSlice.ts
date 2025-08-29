@@ -5,7 +5,14 @@ export interface AdManagerAccount {
     googleId: string;
     email: string;
     displayName: string;
-    networkId: string; // 👈 null hata diya
+    networkId: string; 
+    sites?: Site[];
+}
+interface Site {
+  id: string;
+  url: string;
+  approvalStatus?: string;
+  childNetworkCode?: string;
 }
 interface AdManagerState {
     accounts: AdManagerAccount[];

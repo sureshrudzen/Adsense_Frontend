@@ -101,8 +101,6 @@ export default function MainLayoutManager() {
 
     const rows = data?.rows || [];
     const uniqueSites = Array.from(new Set(rows.map((r) => r.site?.toLowerCase()))).filter(Boolean);
-    console.log(rows, "rows")
-    console.log(uniqueSites, "uniqueSites")
     const normalize = (d: Date) => new Date(d.setHours(0, 0, 0, 0));
     const today = normalize(new Date());
     const yesterday = new Date(today);

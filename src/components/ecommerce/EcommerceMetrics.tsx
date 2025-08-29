@@ -7,8 +7,6 @@ import {
   TableIcon,
 } from "../../icons";
 import Badge from "../ui/badge/Badge";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "../../store";
@@ -17,6 +15,7 @@ import { fetchOfflineReports } from "../../features/adsense/adsenseReportsOfflin
 import { useSearchParams } from "react-router-dom";
 import AdSenseDashboard from "../../pages/AddWebsite/Adsense";
 import ReportViewer from "../../pages/AddWebsite/ReportViewer";
+import FilterPanel from "../common/adsense/FilterPanel";
 
 interface MetricCardProps {
   title: string;
@@ -25,7 +24,15 @@ interface MetricCardProps {
   trend: "up" | "down";
   change: string;
 }
+type ReportRow = {
+  cells: { value: string }[];
+};
 
+type Report = {
+  type: string;
+  headers: string[] | { name: string }[];
+  rows: ReportRow[];
+};
 // 🔹 Helper: format Date → "YYYY-MM-DD"
 function formatDate(d: Date) {
   const year = d.getFullYear();
@@ -35,11 +42,7 @@ function formatDate(d: Date) {
 }
 
 // 🔹 Helper: human-readable date range label
-function getDateRangeLabel(
-  dateRange: string,
-  start: Date | null,
-  end: Date | null
-) {
+function getDateRangeLabel(dateRange: string, start: Date | null, end: Date | null) {
   if (dateRange === "CUSTOM" && start && end) {
     return `${formatDate(start)} → ${formatDate(end)}`;
   }
@@ -50,18 +53,24 @@ function getDateRangeLabel(
   return dateRange;
 }
 
-export default function AdsMetrics({ onData }: { onData?: (data: any) => void }) {
+export default function AdsMetrics() {
+  const defaultColumns = ["ESTIMATED_EARNINGS", "CLICKS", "PAGE_VIEWS", "IMPRESSIONS"];
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns);
+
+  const [siteQuery, setSiteQuery] = useState("");
+  const [selectedSites, setSelectedSites] = useState<string[]>([]);
+  const [showSite, setShowSite] = useState(false);
+  const [domainSearch, setDomainSearch] = useState("");
+
+  const [dateRange, setDateRange] = useState("TODAY");
+  const [range, setRange] = useState<[Date | null, Date | null]>([null, null]);
+  const [country, setCountry] = useState("");
+
   const [searchParams] = useSearchParams();
   const accountId = searchParams.get("account") || "";
   const dispatch = useDispatch<AppDispatch>();
-  const { data, loading, error } = useSelector(
-    (state: RootState) => state.reportsOffline
-  );
 
-  useEffect(() => {
-    dispatch(fetchOfflineReports({ accountId }));
-  }, [dispatch, accountId]);
-
+  const { data, loading, error } = useSelector((state: RootState) => state.reportsOffline);
   const {
     items: sites,
     loading: sitesLoading,
@@ -69,132 +78,98 @@ export default function AdsMetrics({ onData }: { onData?: (data: any) => void })
   } = useSelector((state: RootState) => state.sites);
 
   useEffect(() => {
+    dispatch(fetchOfflineReports({ accountId }));
+  }, [dispatch, accountId]);
+
+  useEffect(() => {
     if (accountId) {
       dispatch(fetchSites(accountId));
     }
   }, [dispatch, accountId]);
 
-  const [dateRange, setDateRange] = useState("TODAY");
-  const [range, setRange] = useState<[Date | null, Date | null]>([null, null]);
-  const [country, setCountry] = useState("");
-
   const [startDate, endDate] = range;
-  const todayReport = data.find((r: any) => r.type === "TODAY");
-  const last30Report = data.find((r: any) => r.type === "LAST_30_DAYS");
 
-  let rows: any[] = [];
-  if (dateRange === "TODAY") {
-    rows = todayReport?.rows || [];
-  } else {
-    rows = last30Report?.rows || [];
-  }
+  const todayReport = data.find((r: any) => r.type === "TODAY") as Report | undefined;
+  const last30Report = data.find((r: any) => r.type === "LAST_30_DAYS") as Report | undefined;
 
-  // 🔹 Dates for today / yesterday
+  const rows: ReportRow[] = (dateRange === "TODAY"
+    ? todayReport?.rows
+    : last30Report?.rows) || [];
+  // 🔹 Date strings
   const todayStr = formatDate(new Date());
   const yesterdayStr = formatDate(new Date(Date.now() - 86400000));
-
-  // 🔹 Start / End for custom ranges
   const startStr = startDate ? formatDate(startDate) : null;
   const endStr = endDate ? formatDate(endDate) : null;
 
-  let filteredRows: any[] = [];
-  if (dateRange === "TODAY") {
-    filteredRows = rows;
-  } else if (dateRange === "YESTERDAY") {
-    filteredRows = rows.filter((row) => row.cells[0]?.value === yesterdayStr);
+  // 🔹 Filtered rows by date
+  let filteredRows: ReportRow[] = [...rows];
+  if (dateRange === "YESTERDAY") {
+    filteredRows = rows.filter(row => row.cells[0]?.value === yesterdayStr);
   } else if (dateRange === "LAST_7_DAYS") {
     const last7 = formatDate(new Date(Date.now() - 6 * 86400000));
-    filteredRows = rows.filter(
-      (row) => row.cells[0]?.value >= last7 && row.cells[0]?.value <= todayStr
-    );
+    filteredRows = rows.filter(row => row.cells[0]?.value >= last7 && row.cells[0]?.value <= todayStr);
   } else if (dateRange === "LAST_30_DAYS") {
     const last30 = formatDate(new Date(Date.now() - 29 * 86400000));
-    filteredRows = rows.filter(
-      (row) => row.cells[0]?.value >= last30 && row.cells[0]?.value <= todayStr
-    );
+    filteredRows = rows.filter(row => row.cells[0]?.value >= last30 && row.cells[0]?.value <= todayStr);
   } else if (dateRange === "CUSTOM" && startStr && endStr) {
-    filteredRows = rows.filter(
-      (row) => row.cells[0]?.value >= startStr && row.cells[0]?.value <= endStr
-    );
+    filteredRows = rows.filter(row => row.cells[0]?.value >= startStr && row.cells[0]?.value <= endStr);
   }
 
-  // 🔹 Aggregate totals
+  // 🔹 Filter by site
+  if (selectedSites.length > 0) {
+    filteredRows = filteredRows.filter(row => selectedSites.includes(row.cells[1]?.value));
+  }
+
+  if (siteQuery.trim()) {
+    const query = siteQuery.toLowerCase();
+    filteredRows = filteredRows.filter(row => row.cells[1]?.value.toLowerCase().includes(query));
+  }
+
+  const uniqueSites = Array.from(
+    new Set(rows.map(row => row.cells[1]?.value).filter(Boolean))
+  ).sort();
+
+  const headers = todayReport?.headers || last30Report?.headers || [];
+
+  const allColumns = headers.map((h: any) => (typeof h === "string" ? h : h.name));
+  // 🔄 Sync default columns with available headers
+  useEffect(() => {
+    if (headers.length > 0) {
+      const headerNames = headers.map((h: any) => (typeof h === "string" ? h : h.name));
+      const filteredDefault = defaultColumns.filter(col => headerNames.includes(col));
+      setVisibleColumns(prev => [...new Set([...prev, ...filteredDefault])]);
+    }
+  }, [headers]);
+
+  function getHeaderIndex(headers: any[], name: string) {
+    return headers.findIndex(h => (typeof h === "string" ? h : h.name) === name);
+  }
+
+  const earningsIndex = getHeaderIndex(headers, "ESTIMATED_EARNINGS");
+  const clicksIndex = getHeaderIndex(headers, "CLICKS");
+  const pageViewsIndex = getHeaderIndex(headers, "PAGE_VIEWS");
+  const impressionsIndex = getHeaderIndex(headers, "IMPRESSIONS");
+
   const totals = filteredRows.reduce(
     (acc, row) => {
       const cells = row.cells || [];
-      acc.earnings += Number(cells[1]?.value || 0);
-      acc.clicks += Number(cells[2]?.value || 0);
-      acc.pageViews += Number(cells[3]?.value || 0);
-      acc.impressions += Number(cells[4]?.value || 0);
+      acc.earnings += Number(cells[earningsIndex]?.value || 0);
+      acc.clicks += Number(cells[clicksIndex]?.value || 0);
+      acc.pageViews += Number(cells[pageViewsIndex]?.value || 0);
+      acc.impressions += Number(cells[impressionsIndex]?.value || 0);
       return acc;
     },
     { earnings: 0, clicks: 0, pageViews: 0, impressions: 0 }
   );
 
+  const toggleColumn = (col: string) => {
+    setVisibleColumns(prev =>
+      prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]
+    );
+  };
+
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-          Adsense Performance Report (
-          {getDateRangeLabel(dateRange, startDate, endDate)})
-        </h3>
-        <div className="space-y-4 md:flex md:space-y-0 md:space-x-4">
-          {/* Date Range Dropdown */}
-          <div className="flex-1">
-            <label className="block text-sm font-medium">Date Range</label>
-            <select
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-              className="border p-2 rounded w-full"
-            >
-              <option value="TODAY">Today</option>
-              <option value="YESTERDAY">Yesterday</option>
-              <option value="LAST_7_DAYS">Last 7 days</option>
-              <option value="LAST_30_DAYS">Last 30 days</option>
-              <option value="CUSTOM">Custom</option>
-            </select>
-          </div>
-
-          {/* Custom Date Picker */}
-          {dateRange === "CUSTOM" && (
-            <div className="flex-1">
-              <label className="block text-sm font-medium mb-1">
-                Select Range
-              </label>
-              <DatePicker
-                selectsRange
-                startDate={startDate}
-                endDate={endDate}
-                onChange={(update) =>
-                  setRange(update as [Date | null, Date | null])
-                }
-                isClearable
-                placeholderText="Select a date range"
-                className="border p-2 rounded w-full focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          )}
-
-          {/* Country Dropdown */}
-          <div className="flex-1">
-            <label className="block text-sm font-medium">Country</label>
-            <select
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              className="border p-2 rounded w-full"
-            >
-              <option value="">All</option>
-              <option value="IN">India</option>
-              <option value="US">United States</option>
-              <option value="GB">United Kingdom</option>
-              <option value="CA">Canada</option>
-              <option value="AU">Australia</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
       {error && <p className="text-red-500">{error}</p>}
 
       {/* Metrics Grid */}
@@ -228,12 +203,38 @@ export default function AdsMetrics({ onData }: { onData?: (data: any) => void })
           change="5.6%"
         />
       </div>
+
       <ReportViewer sites={sites} loading={sitesLoading} error={sitesError} />
+
+      <FilterPanel
+        dateRange={dateRange}
+        setDateRange={setDateRange}
+        range={range}
+        setRange={setRange}
+        country={country}
+        setCountry={setCountry}
+        domainSearch={domainSearch}
+        setDomainSearch={setDomainSearch}
+        visibleColumns={visibleColumns}
+        setVisibleColumns={setVisibleColumns}
+        toggleColumn={toggleColumn}
+        allColumns={allColumns}
+        siteQuery={siteQuery}
+        setSiteQuery={setSiteQuery}
+        uniqueSites={uniqueSites}
+        selectedSites={selectedSites}
+        setSelectedSites={setSelectedSites}
+        showSite={showSite}
+        setShowSite={setShowSite}
+      />
+
+
       <AdSenseDashboard
         rows={filteredRows}
-        headers={todayReport?.headers || last30Report?.headers || []}
+        headers={headers}
         dateRange={getDateRangeLabel(dateRange, startDate, endDate)}
         totals={totals}
+        visibleColumns={visibleColumns}
       />
     </div>
   );

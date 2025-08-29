@@ -126,15 +126,13 @@ const AdManager: React.FC = () => {
                     {startIndex + i + 1}
                   </td>
                   <td className="p-2 sm:p-3 border">
-                    {a.displayName || "Ad Manager Account"}
+                    {a.sites?.[0]?.url || "No site"}
                   </td>
                   <td className="p-2 sm:p-3 border">{a.email || "—"}</td>
                   <td className="p-2 sm:p-3 border">{a.networkId}</td>
                   <td className="p-2 sm:p-3 border text-center space-x-2 sm:space-x-3">
                     <a
-                      href={`/reportadmanager?networkId=${encodeURIComponent(
-                        a?.networkId
-                      )}`}
+                      href={`/reportadmanager?networkId=${encodeURIComponent(a?.networkId)}`}
                       className="inline-block px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200"
                     >
                       View Report
@@ -148,6 +146,7 @@ const AdManager: React.FC = () => {
                   </td>
                 </tr>
               ))}
+
             </tbody>
           </table>
         </div>
