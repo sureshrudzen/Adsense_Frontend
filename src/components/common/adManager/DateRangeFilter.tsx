@@ -26,7 +26,7 @@ export default function DateRangeFilter({
         <select
           value={dateRange}
           onChange={(e) => setDateRange(e.target.value)}
-          className="w-full p-2 pr-12 border rounded-xl dark:bg-gray-700 dark:text-white"
+          className="w-full px-2 py-1 pr-12 border rounded dark:bg-gray-700 dark:text-white"
         >
           {["ALL", "TODAY", "YESTERDAY", "LAST_7_DAYS", "LAST_30_DAYS", "CUSTOM"].map((opt) => (
             <option key={opt} value={opt}>
@@ -37,7 +37,7 @@ export default function DateRangeFilter({
       </div>
 
       {dateRange === "CUSTOM" && (
-        <div className="mt-3 p-2 border rounded-xl bg-blue-50 dark:bg-blue-900/20">
+        <div className="mt-3 p-2 border rounded bg-blue-50 dark:bg-blue-900/20">
           <DatePicker
             selectsRange
             startDate={start}
@@ -45,7 +45,7 @@ export default function DateRangeFilter({
             onChange={(u) => setRange(u as [Date | null, Date | null])}
             isClearable
             placeholderText="Choose date range"
-            className="w-full p-2 border rounded-lg dark:bg-gray-800 dark:text-white"
+            className="w-full px-2 py- border rounded dark:bg-gray-800 dark:text-white"
           />
         </div>
       )}

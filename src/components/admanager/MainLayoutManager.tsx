@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
     DollarLineIcon,
-    EyeIcon,
     MailIcon,
     TableIcon,
 } from "../../icons";
 import ExportPdfButton from "./ExportToPdf"
 import { CircleFadingArrowUp, Camera } from 'lucide-react';
-import DatePicker from "react-datepicker";
+
 import "react-datepicker/dist/react-datepicker.css";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "../../store";
@@ -17,6 +16,7 @@ import ReportListManager from "./ReportListManager";
 import DateRangeFilter from "../common/adManager/DateRangeFilter";
 import WebsiteFilter from "../common/adManager/WebsiteFilter";
 import SelectedSites from "../common/adManager/SelectedSites";
+import CountryMultiSelect from "../common/adManager/CountryMultiSelect";
 
 // Date formatting helper
 function formatDate(d: Date) {
@@ -92,7 +92,25 @@ export default function MainLayoutManager() {
     const [showSite, setShowSite] = useState(false);
 
     const [start, end] = range;
+    const [country, setCountry] = useState<string[]>([]);
 
+    const [isCountryOpen, setIsCountryOpen] = useState(false);
+
+    const toggleCountry = (countryName: string) => {
+        const newCountries = country.includes(countryName)
+            ? country.filter(c => c !== countryName)
+            : [...country, countryName];
+        setCountry(newCountries);
+    };
+
+    const removeCountry = (countryName: string) => {
+        const newCountries = country.filter(c => c !== countryName);
+        setCountry(newCountries);
+    };
+
+    const clearAllCountries = () => {
+        setCountry([]);
+    };
     useEffect(() => {
         if (networkId) {
             dispatch(fetchReport({ networkId, dateRange }));
@@ -115,20 +133,22 @@ export default function MainLayoutManager() {
             selectedSites.length > 0
                 ? selectedSites.includes(r.site?.toLowerCase() || "")
                 : true;
+        const matchCountry = (r: typeof rows[number]) =>
+            country.length > 0
+                ? country.includes(r.country)
+                : true;
 
-        if (dateRange === "ALL" || dateRange === "CUSTOM") {
-            return rows.filter((r) => {
-                const d = normalize(new Date(r.reportDate));
-                let inRange = true;
-                if (dateRange === "CUSTOM" && start && end) {
-                    inRange = d >= normalize(start) && d <= normalize(end);
-                }
-                return inRange && matchSite(r);
-            });
-        }
+        const matchDate = (r: typeof rows[number]) => {
+            const d = normalize(new Date(r.reportDate));
+            if (dateRange === "CUSTOM" && start && end) {
+                return d >= normalize(start) && d <= normalize(end);
+            }
+            return true; // For ALL or pre-set ranges
+        };
 
-        return rows.filter((r) => matchSite(r));
-    }, [rows, dateRange, start, end, selectedSites]);
+        return rows.filter((r) => matchSite(r) && matchCountry(r) && matchDate(r));
+    }, [rows, dateRange, start, end, selectedSites, country]);
+
 
     // Calculate totals from filtered data
     const totals = filtered.reduce(
@@ -182,6 +202,10 @@ export default function MainLayoutManager() {
             dispatch(fetchReport({ networkId, dateRange }));
         }
     };
+    const countries = useMemo(() => {
+        return Array.from(new Set(rows.map((r) => r.country).filter(Boolean)));
+    }, [rows]);
+
     return (
         <div>
             <div className="max-w-7xl mx-auto space-y-2">
@@ -289,9 +313,20 @@ export default function MainLayoutManager() {
 
                 {/* Enhanced Filter Section */}
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-4">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8">
                         {/* Date Range Section */}
                         <DateRangeFilter {...{ dateRange, setDateRange, start, end, setRange, getDateRangeLabel }} />
+                        {/* Country Filter Section */}
+                        <CountryMultiSelect
+                            countries={countries}
+                            selectedCountries={country}
+                            isOpen={isCountryOpen}
+                            toggleOpen={() => setIsCountryOpen(!isCountryOpen)}
+                            toggleCountry={toggleCountry}
+                            removeCountry={removeCountry}
+                            clearAll={clearAllCountries}
+                            closeDropdown={() => setIsCountryOpen(false)}
+                        />
                         {/* Site Search Section */}
                         <WebsiteFilter {...{ siteQuery, setSiteQuery, uniqueSites, selectedSites, setSelectedSites, showSite, setShowSite }} />
                         <div className=" items-end gap-3 ">
@@ -302,6 +337,7 @@ export default function MainLayoutManager() {
                                         setRange([null, null]);
                                         setSelectedSites([]);
                                         setSiteQuery("");
+                                        setCountry([]);
                                     }}
                                     className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium transition-colors"
                                 >
@@ -321,6 +357,7 @@ export default function MainLayoutManager() {
                         headers={[
                             "Date",
                             "Site",
+                            "Country",
                             "Ad Exchange Impressions",
                             "Ad Exchange Clicks",
                             "Ad Exchange Revenue ($)",

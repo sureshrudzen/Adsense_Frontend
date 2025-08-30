@@ -64,7 +64,9 @@ export default function AdsMetrics() {
 
   const [dateRange, setDateRange] = useState("TODAY");
   const [range, setRange] = useState<[Date | null, Date | null]>([null, null]);
-  const [country, setCountry] = useState("");
+const [country, setCountry] = useState<string[]>([]);
+
+
 
   const [searchParams] = useSearchParams();
   const accountId = searchParams.get("account") || "";
@@ -91,7 +93,7 @@ export default function AdsMetrics() {
 
   const todayReport = data.find((r: any) => r.type === "TODAY") as Report | undefined;
   const last30Report = data.find((r: any) => r.type === "LAST_30_DAYS") as Report | undefined;
-
+  const headers = todayReport?.headers || last30Report?.headers || [];
   const rows: ReportRow[] = (dateRange === "TODAY"
     ? todayReport?.rows
     : last30Report?.rows) || [];
@@ -115,6 +117,11 @@ export default function AdsMetrics() {
     filteredRows = rows.filter(row => row.cells[0]?.value >= startStr && row.cells[0]?.value <= endStr);
   }
 
+if (country.length > 0) {
+  const countryIndex = getHeaderIndex(headers, "COUNTRY_NAME"); // or whatever your country column is called
+  filteredRows = filteredRows.filter(row => country.includes(row.cells[countryIndex]?.value));
+}
+
   // 🔹 Filter by site
   if (selectedSites.length > 0) {
     filteredRows = filteredRows.filter(row => selectedSites.includes(row.cells[1]?.value));
@@ -129,7 +136,7 @@ export default function AdsMetrics() {
     new Set(rows.map(row => row.cells[1]?.value).filter(Boolean))
   ).sort();
 
-  const headers = todayReport?.headers || last30Report?.headers || [];
+
 
   const allColumns = headers.map((h: any) => (typeof h === "string" ? h : h.name));
   // 🔄 Sync default columns with available headers
@@ -149,7 +156,7 @@ export default function AdsMetrics() {
   const clicksIndex = getHeaderIndex(headers, "CLICKS");
   const pageViewsIndex = getHeaderIndex(headers, "PAGE_VIEWS");
   const impressionsIndex = getHeaderIndex(headers, "IMPRESSIONS");
-
+  const datesIndex = getHeaderIndex(headers, "DATE");
   const totals = filteredRows.reduce(
     (acc, row) => {
       const cells = row.cells || [];
@@ -157,9 +164,14 @@ export default function AdsMetrics() {
       acc.clicks += Number(cells[clicksIndex]?.value || 0);
       acc.pageViews += Number(cells[pageViewsIndex]?.value || 0);
       acc.impressions += Number(cells[impressionsIndex]?.value || 0);
-      return acc;
+      if (!acc.date && cells[datesIndex]?.value) {
+        acc.date = cells[datesIndex].value;
+      } return acc;
     },
-    { earnings: 0, clicks: 0, pageViews: 0, impressions: 0 }
+    {
+      earnings: 0, clicks: 0, pageViews: 0, impressions: 0,
+      date: "",
+    }
   );
 
   const toggleColumn = (col: string) => {
@@ -167,7 +179,9 @@ export default function AdsMetrics() {
       prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]
     );
   };
-
+  const countries = Array.from(
+    new Set(rows.map(row => row.cells[2]?.value).filter(Boolean))
+  ).sort();
   return (
     <div className="space-y-4">
       {error && <p className="text-red-500">{error}</p>}
@@ -226,6 +240,7 @@ export default function AdsMetrics() {
         setSelectedSites={setSelectedSites}
         showSite={showSite}
         setShowSite={setShowSite}
+        countries={countries}
       />
 
 

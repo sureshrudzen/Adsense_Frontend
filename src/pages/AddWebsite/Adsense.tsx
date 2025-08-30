@@ -11,8 +11,12 @@ interface AdSenseDashboardProps {
     clicks: number;
     pageViews: number;
     impressions: number;
+    avgImpressionsCtr?: number;
+    avgPageViewsCtr?: number;
+    date?: string;
   };
 }
+
 
 export default function AdSenseDashboard({
   rows,
@@ -21,7 +25,6 @@ export default function AdSenseDashboard({
   totals,
   visibleColumns,
 }: AdSenseDashboardProps) {
-  // 🔹 Sorting state
   const [sortConfig, setSortConfig] = useState<{
     key: string;
     direction: "asc" | "desc";
@@ -29,45 +32,82 @@ export default function AdSenseDashboard({
     key: "DATE",
     direction: "asc",
   });
+  const isSiteVisible = visibleColumns.includes("DOMAIN_NAME");
+  const isCountryVisible = visibleColumns.includes("COUNTRY_NAME");
 
-  // 🔹 Pagination state
+  console.log(isSiteVisible, "isSiteVisible")
+
+
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 30;
   const totalPages = Math.ceil(rows.length / rowsPerPage);
-
-  // 🔹 Sorted rows
   const sortedRows = useMemo(() => {
-    const index = headers.findIndex((h) => (h.name || h) === sortConfig.key);
-    if (index === -1) return rows;
+    const sortIndex = headers.findIndex((h) => h.name === sortConfig.key);
+    if (sortIndex === -1) return rows;
 
     return [...rows].sort((a, b) => {
-      const aValue = a.cells[index]?.value;
-      const bValue = b.cells[index]?.value;
+      const aValue = a.cells[sortIndex]?.value ?? "";
+      const bValue = b.cells[sortIndex]?.value ?? "";
 
+      // DATE sorting
       if (sortConfig.key === "DATE") {
         return sortConfig.direction === "asc"
           ? new Date(aValue).getTime() - new Date(bValue).getTime()
           : new Date(bValue).getTime() - new Date(aValue).getTime();
       }
 
+      // Numeric sorting
+      const aNum = Number(aValue);
+      const bNum = Number(bValue);
+      const isNumeric = !isNaN(aNum) && !isNaN(bNum);
+
+      if (isNumeric) {
+        return sortConfig.direction === "asc" ? aNum - bNum : bNum - aNum;
+      }
+
+      // String sorting
       return sortConfig.direction === "asc"
-        ? Number(aValue) - Number(bValue)
-        : Number(bValue) - Number(aValue);
+        ? String(aValue).localeCompare(String(bValue))
+        : String(bValue).localeCompare(String(aValue));
     });
   }, [rows, sortConfig, headers]);
+  const getSortedColumnValues = (columnName: string, direction: "asc" | "desc") => {
+    const index = headers.findIndex(h => h.name === columnName);
+    if (index === -1) return [];
 
-  // 🔹 Paginated rows
+    const values = rows.map(row => row.cells[index]?.value ?? "");
+
+    // ✅ Only sort if this column is selected
+    if (sortConfig.key !== columnName) {
+      return values; // return default order
+    }
+
+    return [...values].sort((a, b) => {
+      const aNum = Number(a);
+      const bNum = Number(b);
+      const isNumeric = !isNaN(aNum) && !isNaN(bNum);
+
+      if (isNumeric) {
+        return direction === "asc" ? aNum - bNum : bNum - aNum;
+      }
+
+      return direction === "asc"
+        ? String(a).localeCompare(String(b))
+        : String(b).localeCompare(String(a));
+    });
+  };
   const paginatedRows = useMemo(() => {
     const start = (currentPage - 1) * rowsPerPage;
     return sortedRows.slice(start, start + rowsPerPage);
   }, [sortedRows, currentPage]);
 
-  // 🔹 Get visible header info
   const visibleHeaderInfo = useMemo(
     () =>
       headers
         .map((h: any, i: number) => ({ header: h, index: i }))
-        .filter(({ header }) => visibleColumns.includes(header.name || header)),
+        .filter(({ header }) =>
+          visibleColumns.includes(typeof header === "string" ? header : header.name)
+        ),
     [headers, visibleColumns]
   );
 
@@ -77,80 +117,102 @@ export default function AdSenseDashboard({
         <h4 className="text-md font-semibold text-gray-700 dark:text-white/80 mb-3">
           Detailed Report ({dateRange})
         </h4>
-
-        <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm">
-          <table className="min-w-full border-collapse table-fixed">
-            <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
-              <tr className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-left">
-                {visibleHeaderInfo.map(({ header, index }) => {
-                  const headerName = header.name || header;
-                  const isSorted = sortConfig.key === headerName;
-
-                  return (
+        <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+          <table className="min-w-full table-fixed border-collapse">
+            <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800">
+              <tr className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+                {headers
+                  .filter(h => visibleColumns.includes(h.name))
+                  .map((h) => (
                     <th
-                      key={headerName}
-                      className="px-4 text-left py-3 border text-sm font-medium cursor-pointer select-none"
+                      key={h.name}
+                      className="px-4 py-3 text-left text-sm font-semibold cursor-pointer select-none border-r last:border-r-0"
                       onClick={() => {
-                        setSortConfig({
-                          key: headerName,
-                          direction:
-                            isSorted && sortConfig.direction === "asc"
-                              ? "desc"
-                              : "asc",
-                        });
-                        setCurrentPage(1);
+                        setSortConfig(prev => ({
+                          key: h.name,
+                          direction: prev.key === h.name && prev.direction === "asc" ? "desc" : "asc"
+                        }));
                       }}
                     >
-                      {headerName} {isSorted ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                      {h.name} {sortConfig.key === h.name ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
                     </th>
-                  );
-                })}
+                  ))}
               </tr>
             </thead>
-
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {paginatedRows.length > 0 ? (
-                paginatedRows.map((row: any, i: number) => (
+              {isSiteVisible && (
+                Array.from({ length: paginatedRows.length }).map((_, rowIndex) => (
                   <tr
-                    key={i}
-                    className={`transition-colors ${
-                      i % 2 === 0
-                        ? "bg-white dark:bg-gray-900"
-                        : "bg-gray-50 dark:bg-gray-800"
-                    } hover:bg-blue-50 dark:hover:bg-gray-700`}
+                    key={rowIndex}
+                    className={`transition-colors ${rowIndex % 2 === 0
+                      ? "bg-white dark:bg-gray-900"
+                      : "bg-gray-50 dark:bg-gray-800"
+                      } hover:bg-blue-50 dark:hover:bg-gray-700`}
                   >
-                    {visibleHeaderInfo.map(({ index }) => {
-                      const cell = row.cells[index];
-                      const headerName = headers[index]?.name || headers[index];
-                      return (
-                        <td
-                          key={`${i}-${index}`}
-                          className="px-4 py-2 text-sm border text-gray-700 dark:text-gray-300"
-                        >
-                          {headerName === "ESTIMATED_EARNINGS"
-                            ? `$${cell?.value}`
-                            : cell?.value}
-                        </td>
-                      );
-                    })}
+                    {headers
+                      .filter(h => visibleColumns.includes(h.name))
+                      .map((h) => {
+                        const sortedValues = getSortedColumnValues(
+                          h.name,
+                          sortConfig.key === h.name ? sortConfig.direction : "asc"
+                        );
+                        return (
+                          <td
+                            key={`${rowIndex}-${h.name}`}
+                            className={`px-4 py-2 text-sm border-r last:border-r-0 text-gray-700 dark:text-gray-300 ${sortConfig.key === h.name
+                              ? "bg-yellow-50 dark:bg-yellow-900 font-semibold"
+                              : ""
+                              }`}
+                          >
+                            {h.name === "ESTIMATED_EARNINGS"
+                              ? `$${sortedValues[rowIndex]}`
+                              : sortedValues[rowIndex]}
+                          </td>
+                        );
+                      })}
                   </tr>
                 ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={visibleHeaderInfo.length}
-                    className="text-center py-4 text-gray-500 dark:text-gray-400"
-                  >
-                    No data for {dateRange}
-                  </td>
-                </tr>
               )}
-
-              {/* 🔹 Totals Row */}
+              {/* {isCountryVisible && (
+                Array.from({ length: paginatedRows.length }).map((_, rowIndex) => (
+                  <tr
+                    key={rowIndex}
+                    className={`transition-colors ${rowIndex % 2 === 0
+                      ? "bg-white dark:bg-gray-900"
+                      : "bg-gray-50 dark:bg-gray-800"
+                      } hover:bg-blue-50 dark:hover:bg-gray-700`}
+                  >
+                    {headers
+                      .filter(h => visibleColumns.includes(h.name))
+                      .map((h) => {
+                        const sortedValues = getSortedColumnValues(
+                          h.name,
+                          sortConfig.key === h.name ? sortConfig.direction : "asc"
+                        );
+                        return (
+                          <td
+                            key={`${rowIndex}-${h.name}`}
+                            className={`px-4 py-2 text-sm border-r last:border-r-0 text-gray-700 dark:text-gray-300 ${sortConfig.key === h.name
+                              ? "bg-yellow-50 dark:bg-yellow-900 font-semibold"
+                              : ""
+                              }`}
+                          >
+                            {h.name === "ESTIMATED_EARNINGS"
+                              ? `$${sortedValues[rowIndex]}`
+                              : sortedValues[rowIndex]}
+                          </td>
+                        );
+                      })}
+                  </tr>
+                ))
+              )} */}
               {totals && (
-                <tr className="bg-blue-100 dark:bg-blue-900 font-semibold">
+                <tr className={`${isSiteVisible
+                  ? "bg-blue-100 dark:bg-blue-900 font-semibold"
+                  : "bg-white dark:bg-gray-900 font-normal"
+                  }`}>
                   {visibleHeaderInfo.map(({ header, index }) => {
-                    const key = header.name || header;
+                    const key = typeof header === "string" ? header : header.name;
                     let value = "";
 
                     switch (key) {
@@ -166,8 +228,25 @@ export default function AdSenseDashboard({
                       case "IMPRESSIONS":
                         value = totals.impressions.toLocaleString();
                         break;
+                      case "IMPRESSIONS_CTR":
+                        value = `${totals.avgImpressionsCtr ?? 0}%`;
+                        break;
+                      case "PAGE_VIEWS_CTR":
+                        value = `${totals.avgPageViewsCtr ?? 0}%`;
+                        break;
+                      case "DATE":
+                      case "day":
+                        if (isSiteVisible) {
+                          value = "TOTAL";
+                        } else if (totals.date) {
+                          value = new Date(totals.date).toLocaleDateString();
+                        } else {
+                          value = "-";
+                        }
+                        break;
+
                       default:
-                        if (key === "DATE" || index === 0) value = "TOTAL";
+                        if (index === 0) value = "TOTAL";
                         break;
                     }
 
@@ -182,11 +261,10 @@ export default function AdSenseDashboard({
                   })}
                 </tr>
               )}
+
             </tbody>
           </table>
         </div>
-
-        {/* 🔹 Pagination */}
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}

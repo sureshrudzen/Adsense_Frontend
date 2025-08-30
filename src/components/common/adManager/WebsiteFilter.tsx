@@ -28,7 +28,7 @@ export default function WebsiteFilter({
           value={siteQuery}
           onChange={(e) => setSiteQuery(e.target.value)}
           placeholder="Search websites..."
-          className="w-full pl-10 p-2 border rounded-xl dark:bg-gray-700 dark:text-white"
+          className="w-full pl-10 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white"
           onFocus={() => setShowSite(true)}
           onBlur={() => setTimeout(() => setShowSite(false), 150)}
         />

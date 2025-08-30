@@ -52,31 +52,31 @@ const navItems: NavItem[] = [
     name: "All Ad Manager Accounts",
     path: "/admanagers"
   },
-  {
-    icon: <GridIcon />,
-    name: "Creative Library",
-    path: "/creative-library"
-  },
-  {
-    icon: <GridIcon />,
-    name: "Suggestions",
-    path: "/suggetions"
-  },
-  {
-    icon: <GridIcon />,
-    name: "Settings",
-    path: "/setings"
-  },
-  {
-    icon: <CalenderIcon />,
-    name: "Calendar",
-    path: "/calendar",
-  },
-  {
-    icon: <UserIcon />,
-    name: "Users",
-    path: "/users"
-  },
+  // {
+  //   icon: <GridIcon />,
+  //   name: "Creative Library",
+  //   path: "/creative-library"
+  // },
+  // {
+  //   icon: <GridIcon />,
+  //   name: "Suggestions",
+  //   path: "/suggetions"
+  // },
+  // {
+  //   icon: <GridIcon />,
+  //   name: "Settings",
+  //   path: "/setings"
+  // },
+  // {
+  //   icon: <CalenderIcon />,
+  //   name: "Calendar",
+  //   path: "/calendar",
+  // },
+  // {
+  //   icon: <UserIcon />,
+  //   name: "Users",
+  //   path: "/users"
+  // },
   {
     icon: <UserCircleIcon />,
     name: "User Profile",
