@@ -112,10 +112,20 @@ export default function MainLayoutManager() {
         setCountry([]);
     };
     useEffect(() => {
-        if (networkId) {
+        if (!networkId) return;
+
+        if (dateRange === "CUSTOM" && start && end) {
+            dispatch(fetchReport({
+                networkId,
+                dateRange,
+                startDate: start.toISOString(),
+                endDate: end.toISOString(),
+            }));
+        } else {
             dispatch(fetchReport({ networkId, dateRange }));
         }
-    }, [dispatch, networkId, dateRange]);
+    }, [dispatch, networkId, dateRange, start, end]);
+
 
     const rows = data?.rows || [];
     const uniqueSites = Array.from(new Set(rows.map((r) => r.site?.toLowerCase()))).filter(Boolean);
@@ -140,7 +150,7 @@ export default function MainLayoutManager() {
 
         const matchDate = (r: typeof rows[number]) => {
             const d = normalize(new Date(r.reportDate));
-            if (dateRange === "CUSTOM" && start && end) {
+            if (dateRange === "CUSTOM_DATE" && start && end) {
                 return d >= normalize(start) && d <= normalize(end);
             }
             return true; // For ALL or pre-set ranges
@@ -313,9 +323,11 @@ export default function MainLayoutManager() {
 
                 {/* Enhanced Filter Section */}
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-4">
                         {/* Date Range Section */}
-                        <DateRangeFilter {...{ dateRange, setDateRange, start, end, setRange, getDateRangeLabel }} />
+                        <div>
+                            <DateRangeFilter {...{ dateRange, setDateRange, start, end, setRange, getDateRangeLabel }} />
+                        </div>
                         {/* Country Filter Section */}
                         <CountryMultiSelect
                             countries={countries}
@@ -328,23 +340,28 @@ export default function MainLayoutManager() {
                             closeDropdown={() => setIsCountryOpen(false)}
                         />
                         {/* Site Search Section */}
-                        <WebsiteFilter {...{ siteQuery, setSiteQuery, uniqueSites, selectedSites, setSelectedSites, showSite, setShowSite }} />
-                        <div className=" items-end gap-3 ">
-                            <div className="flex justify-end items-end px-2">
-                                <button
-                                    onClick={() => {
-                                        setDateRange("TODAY");
-                                        setRange([null, null]);
-                                        setSelectedSites([]);
-                                        setSiteQuery("");
-                                        setCountry([]);
-                                    }}
-                                    className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium transition-colors"
-                                >
-                                    Reset All Filters
-                                </button>
-                            </div>
+                        <div>
+                            <WebsiteFilter
+                                {...{
+                                    siteQuery,
+                                    setSiteQuery,
+                                    uniqueSites,
+                                    selectedSites,
+                                    setSelectedSites,
+                                    showSite,
+                                    setShowSite,
+                                }}
+                                onReset={() => {
+                                    setDateRange("TODAY");
+                                    setRange([null, null]);
+                                    setSelectedSites([]);
+                                    setSiteQuery("");
+                                    setCountry([]);
+                                }}
+                            />
+
                         </div>
+
                         {/* Enhanced Selected Sites Section */}
                     </div>
                     <SelectedSites {...{ selectedSites, setSelectedSites }} />

@@ -83,7 +83,7 @@ export default function AddWebsite() {
 
     return (
         <>
-            <div>
+            <div className="space-y-4 my-8 p-2 bg-white rounded">
                 <h2 className="text-2xl font-semibold mb-4">Add New Website</h2>
                 <form onSubmit={handleSubmit} className="flex flex-wrap gap-4 items-end">
                     {/* Website Name */}

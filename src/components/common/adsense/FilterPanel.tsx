@@ -70,7 +70,17 @@ export default function FilterPanel({
     const clearAllCountries = () => {
         setCountry([]);
     };
-
+    const headerNameMap: Record<string, string> = {
+        PAGE_VIEWS_CTR: "CTR",
+        ESTIMATED_EARNINGS: "Earnings",
+        IMPRESSIONS: "Impressions",
+        CLICKS: "Clicks",
+        PAGE_VIEWS: "Page View",
+        DOMAIN_NAME: "Site",
+        COUNTRY_NAME: "Country",
+        DATE: "Date",
+        COST_PER_CLICK: "CPC"
+    };
     return (
         <>
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-3">
@@ -163,20 +173,20 @@ export default function FilterPanel({
                                     className="w-4 h-4 text-purple-600 bg-gray-100 dark:bg-gray-600 border-gray-300 dark:border-gray-500 rounded focus:ring-purple-500 focus:ring-2 transition-colors"
                                 />
                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
-                                    {col}
+                                    {headerNameMap[col] || col} {/* Use mapped name or fallback to key */}
                                 </span>
                                 <div className="ml-auto">
                                     <div
                                         className={`w-2 h-2 rounded-full transition-all duration-200 ${visibleColumns.includes(col)
-                                            ? "bg-green-500 shadow-lg shadow-green-200"
-                                            : "bg-gray-300"
+                                                ? "bg-green-500 shadow-lg shadow-green-200"
+                                                : "bg-gray-300"
                                             }`}
                                     />
-
                                 </div>
                             </label>
                         ))}
                     </div>
+
                 </div>
             </div>
         </>

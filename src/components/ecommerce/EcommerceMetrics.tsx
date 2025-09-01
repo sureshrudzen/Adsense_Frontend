@@ -1,12 +1,9 @@
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
   DollarLineIcon,
-  EyeIcon,
   MailIcon,
   TableIcon,
 } from "../../icons";
-import Badge from "../ui/badge/Badge";
+import { CircleFadingArrowUp, Camera } from 'lucide-react';
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "../../store";
@@ -17,13 +14,7 @@ import AdSenseDashboard from "../../pages/AddWebsite/Adsense";
 import ReportViewer from "../../pages/AddWebsite/ReportViewer";
 import FilterPanel from "../common/adsense/FilterPanel";
 
-interface MetricCardProps {
-  title: string;
-  value: string;
-  Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  trend: "up" | "down";
-  change: string;
-}
+
 type ReportRow = {
   cells: { value: string }[];
 };
@@ -54,7 +45,7 @@ function getDateRangeLabel(dateRange: string, start: Date | null, end: Date | nu
 }
 
 export default function AdsMetrics() {
-  const defaultColumns = ["ESTIMATED_EARNINGS", "CLICKS", "PAGE_VIEWS", "IMPRESSIONS"];
+  const defaultColumns = ["ESTIMATED_EARNINGS", "CLICKS", "PAGE_VIEWS", "IMPRESSIONS", "CTR"];
   const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns);
 
   const [siteQuery, setSiteQuery] = useState("");
@@ -64,7 +55,7 @@ export default function AdsMetrics() {
 
   const [dateRange, setDateRange] = useState("TODAY");
   const [range, setRange] = useState<[Date | null, Date | null]>([null, null]);
-const [country, setCountry] = useState<string[]>([]);
+  const [country, setCountry] = useState<string[]>([]);
 
 
 
@@ -88,7 +79,13 @@ const [country, setCountry] = useState<string[]>([]);
       dispatch(fetchSites(accountId));
     }
   }, [dispatch, accountId]);
-
+  const refreshData = () => {
+    if (accountId) {
+      // dispatch(fetchReport({ accountId, dateRange }));
+      dispatch(fetchSites(accountId));
+      dispatch(fetchOfflineReports({ accountId }));
+    }
+  };
   const [startDate, endDate] = range;
 
   const todayReport = data.find((r: any) => r.type === "TODAY") as Report | undefined;
@@ -117,10 +114,10 @@ const [country, setCountry] = useState<string[]>([]);
     filteredRows = rows.filter(row => row.cells[0]?.value >= startStr && row.cells[0]?.value <= endStr);
   }
 
-if (country.length > 0) {
-  const countryIndex = getHeaderIndex(headers, "COUNTRY_NAME"); // or whatever your country column is called
-  filteredRows = filteredRows.filter(row => country.includes(row.cells[countryIndex]?.value));
-}
+  if (country.length > 0) {
+    const countryIndex = getHeaderIndex(headers, "COUNTRY_NAME"); // or whatever your country column is called
+    filteredRows = filteredRows.filter(row => country.includes(row.cells[countryIndex]?.value));
+  }
 
   // 🔹 Filter by site
   if (selectedSites.length > 0) {
@@ -136,6 +133,19 @@ if (country.length > 0) {
     new Set(rows.map(row => row.cells[1]?.value).filter(Boolean))
   ).sort();
 
+
+  // console.log(filteredRows, "filteredRows")
+  // const countryIndex = 2;
+
+  // const updatedRows = filteredRows.map(row => {
+  //   // Make a shallow copy of the cells array
+  //   const newCells = row.cells.filter((_, idx) => idx !== countryIndex);
+
+  //   // Return a new row object with updated cells
+  //   return { ...row, cells: newCells };
+  // });
+
+  // console.log(updatedRows, "filteredRows after removing country cell");
 
 
   const allColumns = headers.map((h: any) => (typeof h === "string" ? h : h.name));
@@ -157,6 +167,7 @@ if (country.length > 0) {
   const pageViewsIndex = getHeaderIndex(headers, "PAGE_VIEWS");
   const impressionsIndex = getHeaderIndex(headers, "IMPRESSIONS");
   const datesIndex = getHeaderIndex(headers, "DATE");
+  // const cpcIndex = getHeaderIndex(headers, "COST_PER_CLICK");
   const totals = filteredRows.reduce(
     (acc, row) => {
       const cells = row.cells || [];
@@ -164,13 +175,27 @@ if (country.length > 0) {
       acc.clicks += Number(cells[clicksIndex]?.value || 0);
       acc.pageViews += Number(cells[pageViewsIndex]?.value || 0);
       acc.impressions += Number(cells[impressionsIndex]?.value || 0);
+      // const rowCpc = Number(cells[cpcIndex]?.value || 0);
       if (!acc.date && cells[datesIndex]?.value) {
         acc.date = cells[datesIndex].value;
-      } return acc;
+      }
+
+      acc.cpcSum = acc.earnings / acc.clicks;
+
+      if (!acc.date && cells[datesIndex]?.value) {
+        acc.date = cells[datesIndex].value;
+      }
+
+      if (acc.impressions > 0) {
+        acc.ctr = (acc.clicks / acc.impressions) * 100;
+      } else {
+        acc.ctr = 0; // Avoid division by zero
+      }
+      return acc;
     },
     {
       earnings: 0, clicks: 0, pageViews: 0, impressions: 0,
-      date: "",
+      date: "", ctr: 0, cpcSum: 0,
     }
   );
 
@@ -184,37 +209,74 @@ if (country.length > 0) {
   ).sort();
   return (
     <div className="space-y-4">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+          {/* Icon */}
+          <div className="self-start sm:self-auto p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-lg">
+            <TableIcon className="w-6 h-5 sm:w-8 sm:h-8 text-white" />
+          </div>
+          {/* Title and Subtitle */}
+          <div>
+            <h3 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent">
+              Adsense Performance
+            </h3>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
+              {/* {getDateRangeLabel(dateRange, start, end)} • Real-time Analytics */}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={refreshData}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span className="text-sm font-medium">{loading ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+        </div>
+      </div>
       {error && <p className="text-red-500">{error}</p>}
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 md:gap-6">
         <MetricCard
           title="Total Earnings"
           value={`$${totals.earnings.toLocaleString()}`}
           Icon={DollarLineIcon}
           trend="up"
-          change="8.2%"
+          gradient="from-emerald-500 to-green-600"
+        />
+        <MetricCard
+          title="CTR"
+          value={`${(Math.floor((totals.ctr ?? 0) * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`}
+          Icon={Camera}
+          trend="up"
+          gradient="from-pink-500 to-yellow-600"
         />
         <MetricCard
           title="Clicks"
           value={totals.clicks.toLocaleString()}
           Icon={MailIcon}
           trend="down"
-          change="2.9%"
+          gradient="from-blue-500 to-cyan-600"
         />
         <MetricCard
           title="Page Views"
           value={totals.pageViews.toLocaleString()}
           Icon={TableIcon}
           trend="up"
-          change="6.3%"
+
+          gradient="from-purple-500 to-pink-600"
         />
         <MetricCard
           title="Impressions"
           value={totals.impressions.toLocaleString()}
-          Icon={EyeIcon}
+          Icon={CircleFadingArrowUp}
           trend="up"
-          change="5.6%"
+          gradient="from-orange-500 to-red-600"
         />
       </div>
 
@@ -254,26 +316,39 @@ if (country.length > 0) {
     </div>
   );
 }
-
-function MetricCard({ title, value, Icon, trend, change }: MetricCardProps) {
+function MetricCard({
+  title,
+  value,
+  Icon,
+  gradient,
+}: {
+  title: string;
+  value: string | number;
+  Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  trend: "up" | "down";
+  gradient: string;
+}) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
-      <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl dark:bg-gray-800">
-        <Icon className="text-gray-800 size-6 dark:text-white/90" />
-      </div>
-      <div className="flex items-end justify-between mt-5">
-        <div>
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            {title}
-          </span>
-          <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
-            {value}
-          </h4>
+    <div className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-1 md:p-4 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-600 w-full sm:w-auto">
+      {/* Background gradient effect */}
+      <div
+        className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300 bg-gradient-to-br ${gradient}`}
+      ></div>
+
+      <div className="relative z-10">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className={`p-2 rounded-xl bg-gradient-to-br ${gradient} shadow-lg`}>
+            <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          </div>
+          <div className="flex flex-col items-end sm:items-start">
+            <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 mb-0.5 sm:mb-1">
+              {title}
+            </p>
+            <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">
+              {value}
+            </p>
+          </div>
         </div>
-        <Badge color={trend === "up" ? "success" : "error"}>
-          {trend === "up" ? <ArrowUpIcon /> : <ArrowDownIcon />}
-          {change}
-        </Badge>
       </div>
     </div>
   );

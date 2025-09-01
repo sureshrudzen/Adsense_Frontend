@@ -12,8 +12,9 @@ interface AdSenseDashboardProps {
     pageViews: number;
     impressions: number;
     avgImpressionsCtr?: number;
-    avgPageViewsCtr?: number;
+    ctr?: number;
     date?: string;
+    cpcSum?:Number;
   };
 }
 
@@ -34,10 +35,9 @@ export default function AdSenseDashboard({
   });
   const isSiteVisible = visibleColumns.includes("DOMAIN_NAME");
   const isCountryVisible = visibleColumns.includes("COUNTRY_NAME");
-
-  console.log(isSiteVisible, "isSiteVisible")
-
-
+  //   console.log(isSiteVisible, "isSiteVisible")
+  // console.log(rows,"rows")
+  //   console.log(isCountryVisible, "isCountryVisible")
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 30;
   const totalPages = Math.ceil(rows.length / rowsPerPage);
@@ -105,12 +105,20 @@ export default function AdSenseDashboard({
     () =>
       headers
         .map((h: any, i: number) => ({ header: h, index: i }))
-        .filter(({ header }) =>
-          visibleColumns.includes(typeof header === "string" ? header : header.name)
-        ),
+        .filter(({ header }) => header?.name && visibleColumns.includes(header.name)),
     [headers, visibleColumns]
   );
-
+  const headerNameMap: Record<string, string> = {
+    PAGE_VIEWS_CTR: "CTR",
+    ESTIMATED_EARNINGS: "Earnings",
+    IMPRESSIONS: "Impressions",
+    CLICKS: "Clicks",
+    PAGE_VIEWS: "Page View",
+    DOMAIN_NAME: "Site",
+    COUNTRY_NAME: "Country",
+    DATE: "Date",
+    COST_PER_CLICK: "CPC"
+  };
   return (
     <div>
       <div className="mt-6 overflow-x-auto">
@@ -122,7 +130,7 @@ export default function AdSenseDashboard({
             <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800">
               <tr className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
                 {headers
-                  .filter(h => visibleColumns.includes(h.name))
+                  .filter(h => h?.name && visibleColumns.includes(h.name))
                   .map((h) => (
                     <th
                       key={h.name}
@@ -134,13 +142,16 @@ export default function AdSenseDashboard({
                         }));
                       }}
                     >
-                      {h.name} {sortConfig.key === h.name ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                      {/* 👇 Agar map me hai to short name use karo otherwise original */}
+                      {headerNameMap[h.name] ?? h.name}{" "}
+                      {sortConfig.key === h.name ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
                     </th>
                   ))}
+
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {isSiteVisible && (
+              {isSiteVisible &&
                 Array.from({ length: paginatedRows.length }).map((_, rowIndex) => (
                   <tr
                     key={rowIndex}
@@ -150,67 +161,75 @@ export default function AdSenseDashboard({
                       } hover:bg-blue-50 dark:hover:bg-gray-700`}
                   >
                     {headers
-                      .filter(h => visibleColumns.includes(h.name))
+                      .filter(h => h?.name && visibleColumns?.includes(h.name))
                       .map((h) => {
                         const sortedValues = getSortedColumnValues(
-                          h.name,
-                          sortConfig.key === h.name ? sortConfig.direction : "asc"
+                          h?.name,
+                          sortConfig.key === h?.name ? sortConfig.direction : "asc"
                         );
+
+                        let clickValue = 0;
+                        let impressionValue = 0;
+
+                        const clickHeader = headers.find(header => header?.name === "CLICKS");
+                        const impressionHeader = headers.find(header => header?.name === "IMPRESSIONS");
+
+                        if (clickHeader) {
+                          clickValue = getSortedColumnValues(
+                            clickHeader?.name,
+                            sortConfig.key === clickHeader?.name ? sortConfig.direction : "asc"
+                          )[rowIndex];
+                        }
+
+                        if (impressionHeader) {
+                          impressionValue = getSortedColumnValues(
+                            impressionHeader?.name,
+                            sortConfig.key === impressionHeader?.name ? sortConfig.direction : "asc"
+                          )[rowIndex];
+                        }
+
+                        const cellValue =
+                          h?.name === "PAGE_VIEWS_CTR"
+                            ? impressionValue !== 0
+                              ? (clickValue / impressionValue) * 100
+                              : 0
+                            : sortedValues[rowIndex];
+
+                        const formattedCellValue = isNaN(cellValue) ? cellValue : Number(cellValue);
+
+                        const finalCellValue =
+                          typeof formattedCellValue === "number" && !isNaN(formattedCellValue)
+                            ? formattedCellValue.toFixed(2)
+                            : formattedCellValue;
+
                         return (
                           <td
-                            key={`${rowIndex}-${h.name}`}
-                            className={`px-4 py-2 text-sm border-r last:border-r-0 text-gray-700 dark:text-gray-300 ${sortConfig.key === h.name
+                            key={`${rowIndex}-${h?.name}`}
+                            className={`px-4 py-2 text-sm border-r last:border-r-0 text-gray-700 dark:text-gray-300 ${sortConfig.key === h?.name
                               ? "bg-yellow-50 dark:bg-yellow-900 font-semibold"
                               : ""
                               }`}
                           >
-                            {h.name === "ESTIMATED_EARNINGS"
-                              ? `$${sortedValues[rowIndex]}`
-                              : sortedValues[rowIndex]}
+                            {h?.name === "ESTIMATED_EARNINGS"
+                              ? `$${finalCellValue}`
+                              : h?.name === "PAGE_VIEWS_CTR"
+                                ? `${finalCellValue}%`
+                                : finalCellValue}
                           </td>
                         );
                       })}
                   </tr>
                 ))
-              )}
-              {/* {isCountryVisible && (
-                Array.from({ length: paginatedRows.length }).map((_, rowIndex) => (
-                  <tr
-                    key={rowIndex}
-                    className={`transition-colors ${rowIndex % 2 === 0
-                      ? "bg-white dark:bg-gray-900"
-                      : "bg-gray-50 dark:bg-gray-800"
-                      } hover:bg-blue-50 dark:hover:bg-gray-700`}
-                  >
-                    {headers
-                      .filter(h => visibleColumns.includes(h.name))
-                      .map((h) => {
-                        const sortedValues = getSortedColumnValues(
-                          h.name,
-                          sortConfig.key === h.name ? sortConfig.direction : "asc"
-                        );
-                        return (
-                          <td
-                            key={`${rowIndex}-${h.name}`}
-                            className={`px-4 py-2 text-sm border-r last:border-r-0 text-gray-700 dark:text-gray-300 ${sortConfig.key === h.name
-                              ? "bg-yellow-50 dark:bg-yellow-900 font-semibold"
-                              : ""
-                              }`}
-                          >
-                            {h.name === "ESTIMATED_EARNINGS"
-                              ? `$${sortedValues[rowIndex]}`
-                              : sortedValues[rowIndex]}
-                          </td>
-                        );
-                      })}
-                  </tr>
-                ))
-              )} */}
+              }
+
+
+              {/* Totals Row */}
               {totals && (
                 <tr className={`${isSiteVisible
                   ? "bg-blue-100 dark:bg-blue-900 font-semibold"
                   : "bg-white dark:bg-gray-900 font-normal"
-                  }`}>
+                  }`}
+                >
                   {visibleHeaderInfo.map(({ header, index }) => {
                     const key = typeof header === "string" ? header : header.name;
                     let value = "";
@@ -229,10 +248,15 @@ export default function AdSenseDashboard({
                         value = totals.impressions.toLocaleString();
                         break;
                       case "IMPRESSIONS_CTR":
-                        value = `${totals.avgImpressionsCtr ?? 0}%`;
+                        value = totals.impressions && totals.pageViews
+                          ? ((totals.impressions / totals.pageViews) * 100).toFixed(2) + "%"
+                          : "0.00%";
                         break;
                       case "PAGE_VIEWS_CTR":
-                        value = `${totals.avgPageViewsCtr ?? 0}%`;
+                        value = totals.ctr ? totals.ctr.toFixed(2) + "%" : "0.00%";
+                        break;
+                      case "COST_PER_CLICK":
+                        value = totals.cpcSum ? `$${totals.cpcSum.toFixed(2)}` : "$0.00"; // <-- CPC added
                         break;
                       case "DATE":
                       case "day":
@@ -244,7 +268,6 @@ export default function AdSenseDashboard({
                           value = "-";
                         }
                         break;
-
                       default:
                         if (index === 0) value = "TOTAL";
                         break;
@@ -259,10 +282,21 @@ export default function AdSenseDashboard({
                       </td>
                     );
                   })}
+
+                  {visibleColumns.includes("IMPRESSIONS_CTR") && (
+                    <td
+                      className="px-4 py-2 text-sm border border-blue-200 text-gray-700 dark:text-gray-300"
+                    >
+                      {totals.impressions && totals.pageViews
+                        ? ((totals.impressions / totals.pageViews) * 100).toFixed(2) + "%"
+                        : "0.00%"}
+                    </td>
+                  )}
                 </tr>
               )}
 
             </tbody>
+
           </table>
         </div>
         <Pagination

@@ -6,6 +6,7 @@ interface WebsiteFilterProps {
   setSelectedSites: (sites: string[]) => void;
   showSite: boolean;
   setShowSite: (val: boolean) => void;
+  onReset?: () => void; // ✅ extra prop for reset
 }
 
 export default function WebsiteFilter({
@@ -16,12 +17,28 @@ export default function WebsiteFilter({
   setSelectedSites,
   showSite,
   setShowSite,
+  onReset,
 }: WebsiteFilterProps) {
   return (
-    <div className="space-y-2">
-      <label className="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
-        🌐 Website Filter
-      </label>
+    <div className="space-y-2 relative">
+      {/* Label + Reset button inline */}
+      <div className="flex justify-between items-center">
+        <label className="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+          🌐 Website Filter
+        </label>
+
+        {onReset && (
+          <button
+            type="button"
+            onClick={onReset}
+            className="text-xs bg-red-500 text-white rounded px-2 py-0.5 hover:bg-red-600 transition-colors"
+          >
+            Reset All Filter
+          </button>
+        )}
+      </div>
+
+      {/* Input box */}
       <div className="relative">
         <input
           type="text"
@@ -43,6 +60,7 @@ export default function WebsiteFilter({
         )}
       </div>
 
+      {/* Dropdown list */}
       {showSite && uniqueSites.length > 0 && (
         <div className="absolute w-90 z-20 bg-white dark:bg-gray-800 border rounded-xl shadow-md max-h-48 overflow-y-auto">
           {uniqueSites

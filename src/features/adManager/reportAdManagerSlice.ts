@@ -29,25 +29,35 @@ const initialState: ReportState = {
 interface FetchReportParams {
   networkId: string;
   dateRange: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export const fetchReport = createAsyncThunk<
-  Report, // return type
-  FetchReportParams, // updated input type
-  { rejectValue: string } // error type
+  Report,
+  FetchReportParams,
+  { rejectValue: string }
 >(
   "report/fetchReport",
-  async ({ networkId, dateRange }, { rejectWithValue }) => {
+  async ({ networkId, dateRange, startDate, endDate }, { rejectWithValue }) => {
     try {
       const response = await api.get("/admanager/report", {
-        params: { networkId, dateRange },
+        params: {
+          networkId,
+          dateRange,
+          ...(dateRange === "CUSTOM" && startDate && endDate
+            ? { startDate, endDate }
+            : {}),
+        },
       });
+
       return response.data;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.error || "Failed to fetch report");
     }
   }
 );
+
 
 
 // Slice
