@@ -1,158 +1,122 @@
-import { useEffect, useState } from "react";
-import api from "../../utils/api";
-import ShowWebsites from "./ShowWebsites";
+import { useState, useRef, useEffect } from "react";
+import { useDispatch } from "react-redux";
+import { AppDispatch } from "../../store";
+import { addWebsite } from "../../features/Wbsite/websiteSlice";
 
-interface Website {
-    _id: string;
-    name: string;
-    url: string;
-    description?: string;
+interface AddWebsiteProps {
+    websites: string[];
 }
 
-interface WebsiteFormData {
-    name: string;
-    url: string;
-    description: string;
-}
+export default function AddWebsite({ websites }: AddWebsiteProps) {
+    const dispatch = useDispatch<AppDispatch>();
+    const [url, setUrl] = useState("");
+    const [filtered, setFiltered] = useState<string[]>([]);
+    const [activeIndex, setActiveIndex] = useState(0);
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const wrapperRef = useRef<HTMLDivElement>(null);
 
-export default function AddWebsite() {
-    const [websites, setWebsites] = useState<Website[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
-    const [formData, setFormData] = useState<WebsiteFormData>({
-        name: "",
-        url: "",
-        description: "",
-    });
-
-    const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-    const fetchWebsites = async () => {
-        try {
-            const res = await api.get("/web/websites");
-            setWebsites(res.data);
-        } catch (err: any) {
-            setError("❌ Failed to fetch websites");
-        }
-    };
+    // 🔹 Click outside to close
     useEffect(() => {
-        fetchWebsites();
+        function handleClickOutside(event: MouseEvent) {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                setDropdownOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
     }, []);
 
-    const handleChange = (
-        e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-    ) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+    const handleChange = (value: string) => {
+        setUrl(value);
+        setDropdownOpen(true);
+
+        if (value.trim().length > 0) {
+            const filteredSites = websites.filter((site) =>
+                site.toLowerCase().includes(value.toLowerCase())
+            );
+            setFiltered(filteredSites);
+            setActiveIndex(0);
+        } else {
+            setFiltered(websites); // input empty → poora list
+            setActiveIndex(0);
+        }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        setMessage(null);
+    const handleSelect = (site: string) => {
+        setUrl(site);
+        setDropdownOpen(false);
+    };
 
-        try {
-            const res = await api.post("/web/websites", formData);
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (!dropdownOpen || filtered.length === 0) return;
 
-            if (res.status === 200 || res.status === 201) {
-                setMessage({ type: "success", text: "✅ Website added successfully!" });
-                // Clear form
-                setFormData({ name: "", url: "", description: "" });
-
-                fetchWebsites()
-            } else {
-                setMessage({
-                    type: "error",
-                    text: `⚠️ Unexpected response: ${res.status}`,
-                });
-            }
-        } catch (err: any) {
-            if (err.response) {
-                setMessage({
-                    type: "error",
-                    text: err.response.data.message || `❌ Error: ${err.response.status}`,
-                });
-            } else {
-                setMessage({
-                    type: "error",
-                    text: "❌ Server not reachable!",
-                });
-            }
-        } finally {
-            setLoading(false);
+        if (e.key === "ArrowDown") {
+            setActiveIndex((prev) => (prev + 1) % filtered.length);
+        } else if (e.key === "ArrowUp") {
+            setActiveIndex((prev) => (prev === 0 ? filtered.length - 1 : prev - 1));
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            handleSelect(filtered[activeIndex]);
         }
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!url) return;
+        dispatch(addWebsite(url));
+        setUrl("");
+        setFiltered([]);
+        setDropdownOpen(false);
+    };
+
+    const handleFocus = () => {
+        setDropdownOpen(true);
+        setFiltered(websites); // click pe poora list show
     };
 
     return (
-        <>
-            <div className="space-y-4 my-8 p-2 bg-white rounded">
-                <h2 className="text-2xl font-semibold mb-4">Add New Website</h2>
-                <form onSubmit={handleSubmit} className="flex flex-wrap gap-4 items-end">
-                    {/* Website Name */}
-                    <div className="flex-1 min-w-[200px]">
-                        <label className="block text-gray-700 font-medium mb-1">Website Name</label>
-                        <input
-                            type="text"
-                            name="name"
-                            value={formData.name}
-                            onChange={handleChange}
-                            placeholder="Enter website name"
-                            required
-                            className="w-full border rounded-lg p-2 focus:ring focus:ring-blue-200"
-                        />
-                    </div>
+        <div ref={wrapperRef} className="mx-auto my-8 p-4 bg-white rounded shadow relative">
+            <h2 className="text-2xl font-semibold mb-4">Add New Website</h2>
 
-                    {/* Website URL */}
-                    <div className="flex-1 min-w-[250px]">
-                        <label className="block text-gray-700 font-medium mb-1">Website URL</label>
-                        <input
-                            type="url"
-                            name="url"
-                            value={formData.url}
-                            onChange={handleChange}
-                            required
-                            placeholder="https://example.com"
-                            className="w-full border rounded-lg p-2 focus:ring focus:ring-blue-200"
-                        />
-                    </div>
+            <form className="flex flex-col gap-2" onSubmit={handleSubmit}>
+                <div className="relative w-full">
+                    <input
+                        type="text"
+                        placeholder="example.com"
+                        className="border rounded p-2 w-full z-20 relative"
+                        value={url}
+                        onChange={(e) => handleChange(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        onFocus={handleFocus}
+                    />
 
-                    {/* Description */}
-                    <div className="flex-1 min-w-[250px] mt-1">
-                        <label className="block text-gray-700 font-medium mb-1">Description</label>
-                        <textarea
-                            name="description"
-                            value={formData.description}
-                            onChange={handleChange}
-                            placeholder="Enter decscription (optional)"
-                            rows={1}
-                            className="w-full border rounded-lg p-2 focus:ring focus:ring-blue-200 resize-none"
-                        />
-                    </div>
+                    {/* Dropdown */}
+                    {dropdownOpen && filtered.length > 0 && (
+                        <ul className="absolute top-full left-0 w-full bg-white border rounded shadow max-h-40 overflow-auto z-10 mt-1">
+                            {filtered.map((site, idx) => (
+                                <li
+                                    key={site}
+                                    className={`px-3 py-2 cursor-pointer ${idx === activeIndex ? "bg-blue-100" : "hover:bg-blue-50"
+                                        }`}
+                                    onClick={() => handleSelect(site)}
+                                >
+                                    {site}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
 
-                    {/* Submit Button */}
-                    <div>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                        >
-                            {loading ? "Adding..." : "Add"}
-                        </button>
-                    </div>
-                </form>
+                <button
+                    type="submit"
+                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2"
+                >
+                    Add
+                </button>
+            </form>
+        </div>
 
-                {message && (
-                    <p
-                        className={`mt-4 text-center text-sm ${message.type === "success" ? "text-green-600" : "text-red-600"
-                            }`}
-                    >
-                        {message.text}
-                    </p>
-                )}
-            </div>
-
-            {/* ✅ Websites ko props me bhej diya */}
-            <div>
-                <ShowWebsites websites={websites} error={error} />
-            </div>
-        </>
     );
 }

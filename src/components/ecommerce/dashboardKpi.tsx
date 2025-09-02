@@ -16,45 +16,52 @@ interface MetricCardProps {
   trend: "up" | "down";
   change: string;
 }
+interface Totals {
+  earnings: number;
+  clicks: number;
+  pageViews: number;
+  impressions: number;
+}
 
+interface DashboardKpiProps {
+  totals: Totals;
+}
 // 🔹 Helper: format Date → "YYYY-MM-DD"
-export default function dDashboardKpi() {
-
+export default function DashboardKpi({ totals }: DashboardKpiProps) {
   return (
     <div className="space-y-4">
-      {/* Filters */}
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
           Adsense Performance Report
         </h3>
-       
       </div>
+
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:gap-6">
         <MetricCard
           title="Total Earnings"
-          value={`50`}
+          value={`$${totals.earnings.toFixed(2)}`}
           Icon={DollarLineIcon}
           trend="up"
           change="8.2%"
         />
         <MetricCard
           title="Clicks"
-          value={`52`}
+          value={totals.clicks.toString()}
           Icon={MailIcon}
           trend="down"
           change="2.9%"
         />
         <MetricCard
           title="Page Views"
-          value={`20`}
+          value={totals.pageViews.toString()}
           Icon={TableIcon}
           trend="up"
           change="6.3%"
         />
         <MetricCard
           title="Impressions"
-          value={`56`}
+          value={totals.impressions.toString()}
           Icon={EyeIcon}
           trend="up"
           change="5.6%"

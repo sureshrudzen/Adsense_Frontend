@@ -1,71 +1,46 @@
 interface Website {
   _id: string;
-  name: string;
   url: string;
-  description?: string;
+}
+
+interface ShowWebsitesProps {
+  websites: Website[];
+  error: string;
+  onDelete: (id: string) => void;
 }
 
 export default function ShowWebsites({
   websites,
   error,
-}: {
-  websites: Website[];
-  error: string;
-}) {
-  if (error) return <p className="text-red-600 text-center">{error}</p>;
-
+  onDelete,
+}: ShowWebsitesProps) {
   return (
-    <div className="mt-10">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800">🌐 All Websites</h2>
-
-      {websites.length === 0 ? (
-        <p className="text-gray-600 text-center italic">
-          No websites found. Please add one!
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-2xl shadow-lg">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-left">
-                <th className="px-6 py-3 text-sm font-semibold w-16">#</th>
-                <th className="px-6 py-3 text-sm font-semibold">Name</th>
-                <th className="px-6 py-3 text-sm font-semibold">URL</th>
-                <th className="px-6 py-3 text-sm font-semibold">Description</th>
-              </tr>
-            </thead>
-            <tbody>
-              {websites.map((site, idx) => (
-                <tr
-                  key={site._id}
-                  className={`${
-                    idx % 2 === 0 ? "bg-white" : "bg-gray-50"
-                  } hover:bg-blue-50 transition-colors`}
-                >
-                  <td className="px-6 py-3 text-gray-700 font-medium text-center">
-                    {idx + 1}
-                  </td>
-                  <td className="px-6 py-3 text-gray-800 font-medium">
-                    {site.name}
-                  </td>
-                  <td className="px-6 py-3">
-                    <a
-                      href={site.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 font-medium underline"
-                    >
-                      {site.url.replace(/^https?:\/\/(www\.)?/, "")}
-                    </a>
-                  </td>
-                  <td className="px-6 py-3 text-gray-600">
-                    {site.description || "-"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+    <div className="md:px-0 max-w-5xl mx-auto">
+      {error && (
+        <p className="text-red-600 text-center text-lg mt-4 font-medium">{error}</p>
       )}
+
+      {/* List of all websites */}
+      <div className="flex flex-col gap-2 mt-4">
+        {websites.length === 0 ? (
+          <p className="text-gray-500 text-center italic">No websites found.</p>
+        ) : (
+          websites.map(site => (
+            <div
+              key={site._id}
+              className="flex items-center justify-between border rounded-lg p-2 bg-white hover:shadow"
+            >
+              <span>{site.url.replace(/^https?:\/\/(www\.)?/, "")}</span>
+              <button
+                onClick={() => onDelete(site._id)}
+                className="px-2 py-1 text-xs text-white bg-red-500 rounded hover:bg-red-600"
+              >
+                Delete
+              </button>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

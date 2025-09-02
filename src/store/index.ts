@@ -5,7 +5,7 @@ import reportsOfflineReducer from "../features/adsense/adsenseReportsOfflineSlic
 import sitesReducer from "../features/sites/sitesSlice";
 import adManagerReducer from "../features/adManager/adManagerSlice"
 import admanagerreportReducer from "../features/adManager/reportAdManagerSlice"
-
+import websiteReducer from "../features/Wbsite/websiteSlice"
 export const store = configureStore({
   reducer: {
     adsense: adsenseReducer,
@@ -14,6 +14,7 @@ export const store = configureStore({
     sites: sitesReducer,
     admanager: adManagerReducer,
     admanagerReport: admanagerreportReducer,
+    websites: websiteReducer,
   },
 });
 
